@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.env
+backend/.env
+*.egg-info/
+dist/
+build/
+
+# ChromaDB
+chroma_db/
+
+# Uploads
+uploads/
+
+# Node
+node_modules/
+.next/
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Model cache
+.cache/
+models/
