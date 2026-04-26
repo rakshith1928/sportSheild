@@ -9,7 +9,7 @@ load_dotenv()
 
 from routers import upload, scan, explain, report
 from services.rag_engine import init_rag
-#from services.fingerprint import init_clip_model
+from services.fingerprint import init_clip_model
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     os.makedirs(os.getenv("UPLOAD_DIR", "uploads"), exist_ok=True)
     os.makedirs("chroma_db", exist_ok=True)
     print("📦 Loading CLIP model...")
-    #init_clip_model()
+    init_clip_model()
     print("📚 Initializing RAG knowledge base...")
     init_rag()
     print("✅ SportShield AI ready!")
