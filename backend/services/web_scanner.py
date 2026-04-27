@@ -23,7 +23,6 @@ async def download_image(url: str) -> Image.Image | None:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(url)
 
-            #  Validate status + content type
             if response.status_code != 200:
                 print(f" Bad status {response.status_code} for {url}")
                 return None
@@ -33,7 +32,6 @@ async def download_image(url: str) -> Image.Image | None:
                 print(f" Not an image ({content_type}): {url}")
                 return None
 
-            #  Size limit — skip images over 5MB
             if len(response.content) > 5 * 1024 * 1024:
                 print(f" Image too large (>5MB): {url}")
                 return None
@@ -43,9 +41,8 @@ async def download_image(url: str) -> Image.Image | None:
             ).convert("RGB")
             return image
 
-    #  Error logging
     except Exception as e:
-        print(f" Failed to download {url}: {e}")
+        print(f"Failed to download {url}: {e}")
         return None
 
 async def scan_google_for_asset(
@@ -57,7 +54,7 @@ async def scan_google_for_asset(
 ) -> dict:
     """
     Search Google for unauthorized copies of an asset.
-    Returns list of violations found.
+    Downloads all images in parallel then compares.
     """
     if not GOOGLE_API_KEY or not GOOGLE_CSE_ID:
         return {
@@ -67,15 +64,13 @@ async def scan_google_for_asset(
     if threshold is None:
         threshold = float(os.getenv("SIMILARITY_THRESHOLD", 0.85))
 
-    # Improved search query
+    #Improved search query
     query = f"{team} {sport} {description} logo OR poster OR official"
     print(f"🔍 Scanning web for: {query}")
 
     violations = []
     scanned_urls = []
     errors = []
-
-    #  Prevent duplicate URLs
     seen_urls = set()
 
     try:
@@ -88,34 +83,43 @@ async def scan_google_for_asset(
             num=10
         ).execute()
 
-        #  Handle empty results safely
+        # Handle empty results safely
         items = result.get("items", []) or []
         print(f"📸 Found {len(items)} images to scan")
+
+        #Build parallel download tasks
+        tasks = []
+        url_map = []
 
         for item in items:
             image_url = item.get("link")
             page_url = item.get("image", {}).get("contextLink", image_url)
 
-            #  Skip if no URL or already seen
+            # Skip if no URL or already seen
             if not image_url or image_url in seen_urls:
                 continue
 
             seen_urls.add(image_url)
             scanned_urls.append(image_url)
 
-            # Download and compare
-            image = await download_image(image_url)
-            if image is None:
+            tasks.append(download_image(image_url))
+            url_map.append((image_url, page_url, item))
+
+        # Download all images in parallel
+        print(f"⬇️ Downloading {len(tasks)} images in parallel...")
+        images = await asyncio.gather(*tasks)
+
+        # Process results
+        for img, (image_url, page_url, item) in zip(images, url_map):
+            if img is None:
                 errors.append({
                     "url": image_url,
-                    "reason": "Could not download"
+                    "reason": "Download failed"
                 })
-                # Rate limiting
-                await asyncio.sleep(0.5)
                 continue
 
             # Compare against protected assets
-            matches = compare_image_to_db(image, threshold=threshold)
+            matches = compare_image_to_db(img, threshold=threshold)
 
             # Filter for this specific asset
             asset_matches = [
@@ -124,7 +128,7 @@ async def scan_google_for_asset(
             ]
 
             if asset_matches:
-                # 1️ Fix best match bug — sort first
+                # Sort and pick best match
                 best_match = sorted(
                     asset_matches,
                     key=lambda x: x["clip_similarity"],
@@ -141,9 +145,6 @@ async def scan_google_for_asset(
                     "detected_at": datetime.utcnow().isoformat(),
                     "asset_id": asset_id
                 })
-
-            # 8️ Rate limiting between requests
-            await asyncio.sleep(0.5)
 
     except Exception as e:
         return {
