@@ -1,12 +1,12 @@
 import os
 import httpx
+import asyncio
 from PIL import Image
 import io
 from googleapiclient.discovery import build
 from services.fingerprint import compare_image_to_db
 from datetime import datetime
 
-# Google API setup
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
 
@@ -22,12 +22,30 @@ async def download_image(url: str) -> Image.Image | None:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(url)
-            if response.status_code == 200:
-                image = Image.open(
-                    io.BytesIO(response.content)
-                ).convert("RGB")
-                return image
-    except Exception:
+
+            #  Validate status + content type
+            if response.status_code != 200:
+                print(f" Bad status {response.status_code} for {url}")
+                return None
+
+            content_type = response.headers.get("content-type", "")
+            if "image" not in content_type:
+                print(f" Not an image ({content_type}): {url}")
+                return None
+
+            #  Size limit — skip images over 5MB
+            if len(response.content) > 5 * 1024 * 1024:
+                print(f" Image too large (>5MB): {url}")
+                return None
+
+            image = Image.open(
+                io.BytesIO(response.content)
+            ).convert("RGB")
+            return image
+
+    #  Error logging
+    except Exception as e:
+        print(f" Failed to download {url}: {e}")
         return None
 
 async def scan_google_for_asset(
@@ -49,36 +67,40 @@ async def scan_google_for_asset(
     if threshold is None:
         threshold = float(os.getenv("SIMILARITY_THRESHOLD", 0.85))
 
-    # Build search query
-    query = f"{sport} {team} {description} official media"
-
+    # Improved search query
+    query = f"{team} {sport} {description} logo OR poster OR official"
     print(f"🔍 Scanning web for: {query}")
 
     violations = []
     scanned_urls = []
     errors = []
 
+    #  Prevent duplicate URLs
+    seen_urls = set()
+
     try:
         service = build_google_client()
 
-        # Search for images
         result = service.cse().list(
             q=query,
             cx=GOOGLE_CSE_ID,
             searchType="image",
-            num=10  # max per request on free tier
+            num=10
         ).execute()
 
-        items = result.get("items", [])
+        #  Handle empty results safely
+        items = result.get("items", []) or []
         print(f"📸 Found {len(items)} images to scan")
 
         for item in items:
             image_url = item.get("link")
             page_url = item.get("image", {}).get("contextLink", image_url)
 
-            if not image_url:
+            #  Skip if no URL or already seen
+            if not image_url or image_url in seen_urls:
                 continue
 
+            seen_urls.add(image_url)
             scanned_urls.append(image_url)
 
             # Download and compare
@@ -88,19 +110,27 @@ async def scan_google_for_asset(
                     "url": image_url,
                     "reason": "Could not download"
                 })
+                # Rate limiting
+                await asyncio.sleep(0.5)
                 continue
 
-            # Compare against our protected asset
+            # Compare against protected assets
             matches = compare_image_to_db(image, threshold=threshold)
 
-            # Filter matches for this specific asset
+            # Filter for this specific asset
             asset_matches = [
                 m for m in matches
                 if m["asset_id"] == asset_id
             ]
 
             if asset_matches:
-                best_match = asset_matches[0]
+                # 1️ Fix best match bug — sort first
+                best_match = sorted(
+                    asset_matches,
+                    key=lambda x: x["clip_similarity"],
+                    reverse=True
+                )[0]
+
                 violations.append({
                     "image_url": image_url,
                     "page_url": page_url,
@@ -112,11 +142,21 @@ async def scan_google_for_asset(
                     "asset_id": asset_id
                 })
 
+            # 8️ Rate limiting between requests
+            await asyncio.sleep(0.5)
+
     except Exception as e:
         return {
             "error": f"Scan failed: {str(e)}",
             "asset_id": asset_id
         }
+
+    # Sort violations by similarity
+    violations = sorted(
+        violations,
+        key=lambda x: x["clip_similarity"],
+        reverse=True
+    )
 
     print(f"🚨 Found {len(violations)} violations")
 
