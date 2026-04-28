@@ -2,47 +2,73 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from services.report_generator import generate_report
-from services.fingerprint import get_all_assets
+from services.rag_engine import explain_violation  #RAG integration
 import chromadb
 import uuid
 import os
 
 router = APIRouter()
-
 REPORTS_DIR = "reports"
+
+# ✅ Initialize DB ONCE (performance fix)
+chroma_client = chromadb.PersistentClient(
+    path=os.getenv("CHROMA_DB_PATH", "./chroma_db")
+)
+collection = chroma_client.get_or_create_collection("sports_assets")
+
+
+# ✅ Structured validation
+class Violation(BaseModel):
+    page_url: str
+    clip_similarity: float
+    is_likely_copy: bool
+    detected_at: str
 
 
 class ReportRequest(BaseModel):
     asset_id: str
-    violations: list
+    violations: list[Violation]
 
 
 @router.post("/generate")
 async def generate_violation_report(request: ReportRequest):
-    """Generate a PDF report for an asset and its violations"""
+    """Generate AI-powered PDF report for an asset"""
 
     # Validate asset exists
-    chroma_client = chromadb.PersistentClient(
-        path=os.getenv("CHROMA_DB_PATH", "./chroma_db")
-    )
-    collection = chroma_client.get_or_create_collection("sports_assets")
-
     try:
         result = collection.get(ids=[request.asset_id])
         if not result["ids"]:
             raise HTTPException(status_code=404, detail="Asset not found")
         asset = result["metadatas"][0]
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Asset not found: {str(e)}")
+        raise HTTPException(status_code=404, detail=f"Asset error: {str(e)}")
 
-    # Generate report
+    # Ensure reports directory exists
+    os.makedirs(REPORTS_DIR, exist_ok=True)
+
     try:
+        enriched_violations = []
+
+        # 🔥 RAG + LLM enrichment
+        for v in request.violations:
+            v_dict = v.dict()
+
+            analysis = explain_violation(v_dict)
+
+            enriched_violations.append({
+                **v_dict,
+                "severity": analysis.get("severity"),
+                "confidence": round(v_dict.get("clip_similarity", 0) * 100, 2),
+                "explanation": analysis.get("explanation"),
+                "recommended_action": analysis.get("recommended_action")
+            })
+
+        # Generate report
         report_id = str(uuid.uuid4())[:8].upper()
+
         file_path = generate_report(
             asset=asset,
-            violations=request.violations,
+            violations=enriched_violations,  # ✅ FIXED
             report_id=report_id,
             output_dir=REPORTS_DIR
         )
@@ -51,7 +77,7 @@ async def generate_violation_report(request: ReportRequest):
             "success": True,
             "report_id": report_id,
             "download_url": f"/report/download/{report_id}",
-            "message": f"Report generated with {len(request.violations)} violations"
+            "violations_analyzed": len(enriched_violations)
         }
 
     except Exception as e:
