@@ -1,0 +1,44 @@
+Sports Broadcasting and Media Rights
+
+International Framework:
+1. Sports organizations own broadcast rights to their events
+2. Media rights are sold exclusively to broadcasters
+3. Unauthorized redistribution violates multiple laws
+4. Digital piracy of sports content is a global problem
+
+Types of Protected Sports Media:
+1. Live match broadcasts
+2. Highlight packages
+3. Official team logos and badges
+4. Player images and likeness
+5. Official match photography
+6. Team uniforms and merchandise designs
+7. Trophy and award imagery
+8. Stadium and venue footage
+
+Common Violations:
+1. Unauthorized streaming on social media
+2. Reposting official match highlights without license
+3. Using team logos without permission
+4. Selling merchandise with protected designs
+5. Screen recording and redistribution of broadcasts
+
+How To File A Takedown Notice:
+1. YouTube: youtube.com/copyright_complaint_form
+2. Facebook/Instagram: facebook.com/help/contact/1758255661104383
+3. Twitter/X: help.twitter.com/forms/dmca
+4. General DMCA: send to platform's designated DMCA agent
+
+Recommended Actions By Severity:
+Low (similarity 0.75-0.85):
+- Monitor the URL
+- Send informal cease and desist
+
+Medium (similarity 0.85-0.92):
+- File platform takedown notice
+- Send formal cease and desist letter
+
+High (similarity above 0.92):
+- File DMCA takedown immediately
+- Consider legal action
+- Report to sports organization legal team
