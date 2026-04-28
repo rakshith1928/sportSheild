@@ -106,7 +106,7 @@ async def scan_google_for_asset(
             url_map.append((image_url, page_url, item))
 
         # Download all images in parallel
-        print(f"⬇️ Downloading {len(tasks)} images in parallel...")
+        print(f" Downloading {len(tasks)} images in parallel...")
         images = await asyncio.gather(*tasks)
 
         # Process results

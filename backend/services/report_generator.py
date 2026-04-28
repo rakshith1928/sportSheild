@@ -338,7 +338,7 @@ def generate_report(
 
     else:
         story.append(Paragraph(
-            "✅ No violations detected. Your asset appears to be protected.",
+            " No violations detected. Your asset appears to be protected.",
             styles["body"]
         ))
 
@@ -352,5 +352,5 @@ def generate_report(
     ))
 
     doc.build(story)
-    print(f"📄 Report generated: {file_path}")
+    print(f"Report generated: {file_path}")
     return file_path

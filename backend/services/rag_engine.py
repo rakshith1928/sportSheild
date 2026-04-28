@@ -27,12 +27,12 @@ def init_rag():
         print("✅ Groq client initialized")
 
     # Load embeddings model
-    print("🔤 Loading embedding model...")
+    print("Loading embedding model...")
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     )
 
-    # 1️⃣ FIX: Load existing DB instead of rebuilding every run
+    # FIX: Load existing DB instead of rebuilding every run
     rag_vectorstore = Chroma(
         persist_directory="./chroma_db",
         embedding_function=embeddings,
@@ -87,12 +87,12 @@ def query_rag(query: str, k: int = 3, law_filter: str = None) -> list:
     if rag_vectorstore is None:
         return []
 
-    # 3️⃣ FIX: Optional metadata filtering by law type
+    #  Optional metadata filtering by law type
     search_kwargs = {"k": k}
     if law_filter:
         search_kwargs["filter"] = {"law": law_filter}
 
-    # 1️⃣ FIX: Use similarity_search_with_score to get relevance scores
+    # Use similarity_search_with_score to get relevance scores
     results = rag_vectorstore.similarity_search_with_score(query, **search_kwargs)
 
     filtered = []
@@ -101,7 +101,7 @@ def query_rag(query: str, k: int = 3, law_filter: str = None) -> list:
         # Convert to 0-1 similarity: 1 = perfect match
         similarity = 1 / (1 + score)
 
-        # 1️⃣ FIX: Filter out low-relevance chunks
+        #  FIX: Filter out low-relevance chunks
         if similarity < 0.4:
             print(f"⚠️ Skipping low-relevance chunk (score={score:.3f}): {doc.page_content[:60]}...")
             continue
