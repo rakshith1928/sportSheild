@@ -100,3 +100,73 @@ def get_scan_by_id(scan_id: str) -> dict | None:
         client.table("scans").select("*").eq("id", scan_id).single().execute()
     )
     return result.data
+
+# ─── Violations ────────────────────────────────────────────
+def insert_violation(violation_data: dict, scan_id: str = None) -> dict:
+    """Store a detected violation."""
+    client = get_supabase_client()
+    row = {
+        "asset_id": violation_data.get("asset_id"),
+        "scan_id": scan_id,
+        "image_url": violation_data["image_url"],
+        "page_url": violation_data["page_url"],
+        "title": violation_data.get("title", "Unknown"),
+        "clip_similarity": violation_data["clip_similarity"],
+        "phash_distance": violation_data.get("phash_distance"),
+        "is_likely_copy": violation_data.get("is_likely_copy", False),
+        "detected_at": violation_data.get("detected_at",
+                                          datetime.now(timezone.utc).isoformat()),
+    }
+    result = client.table("violations").insert(row).execute()
+    return result.data[0] if result.data else row
+def get_violations(
+    asset_id: str = None,
+    severity: str = None,
+) -> list[dict]:
+    """Query violations with optional filters, sorted by similarity desc."""
+    client = get_supabase_client()
+    query = (
+        client.table("violations")
+        .select("*")
+        .order("clip_similarity", desc=True)
+    )
+    if asset_id:
+        query = query.eq("asset_id", asset_id)
+    if severity:
+        query = query.eq("severity", severity)
+    result = query.execute()
+    return result.data or []
+def check_violation_exists(image_url: str) -> bool:
+    """Check if a violation with this image_url already exists (dedup)."""
+    client = get_supabase_client()
+    result = (
+        client.table("violations")
+        .select("id")
+        .eq("image_url", image_url)
+        .limit(1)
+        .execute()
+    )
+    return bool(result.data)
+# ─── Reports ──────────────────────────────────────────────
+def insert_report(report_meta: dict) -> dict:
+    """Store report metadata after PDF generation."""
+    client = get_supabase_client()
+    row = {
+        "report_id": report_meta["report_id"],
+        "asset_id": report_meta.get("asset_id"),
+        "violations_analyzed": report_meta.get("violations_analyzed", 0),
+        "file_path": report_meta.get("file_path"),
+        "download_url": report_meta.get("download_url"),
+    }
+    result = client.table("reports").insert(row).execute()
+    return result.data[0] if result.data else row
+def get_reports() -> list[dict]:
+    """List all reports, newest first."""
+    client = get_supabase_client()
+    result = (
+        client.table("reports")
+        .select("*")
+        .order("generated_at", desc=True)
+        .execute()
+    )
+    return result.data or []
