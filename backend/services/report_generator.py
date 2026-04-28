@@ -129,10 +129,10 @@ def summary_block(story, styles, asset: dict, violations: list):
     high = sum(1 for v in violations if v.get("severity") == "HIGH")
     medium = sum(1 for v in violations if v.get("severity") == "MEDIUM")
     low = sum(1 for v in violations if v.get("severity") == "LOW")
-    avg_conf = (
-        round(sum(v.get("confidence", 0) for v in violations) / total, 1)
-        if total else 0
-    )
+    
+    valid_conf = [v.get("confidence", 0) for v in violations if v.get("confidence") is not None]
+    avg_conf = round(sum(valid_conf) / len(valid_conf), 1) if valid_conf else 0
+
 
     stats = [
         ["Total Violations", "High Severity", "Avg Confidence"],
