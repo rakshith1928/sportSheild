@@ -1,15 +1,17 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from services.web_scanner import scan_google_for_asset
+from services.database import (
+    insert_scan, update_scan_status, insert_violation,
+    get_violations, check_violation_exists,
+    get_scan_history, get_scan_by_id,
+)
 import chromadb
 import asyncio
 import os
 
 router = APIRouter()
 
-# In-memory violations store
-# Phase 5 will move this to PostgreSQL
-violations_store = []
 
 @router.post("/{asset_id}")
 async def scan_asset(asset_id: str):
@@ -38,6 +40,11 @@ async def scan_asset(asset_id: str):
             detail=f"Asset not found: {str(e)}"
         )
 
+    # Create scan record in Supabase
+    query_used = f"{metadata.get('sport', '')} {metadata.get('team', '')} {metadata.get('description', '')}"
+    scan_record = insert_scan(asset_id=asset_id, query_used=query_used.strip())
+    scan_id = scan_record.get("id")
+
     # Run web scan
     print(f"🔍 Starting scan for asset: {asset_id}")
     scan_result = await scan_google_for_asset(
@@ -52,72 +59,79 @@ async def scan_asset(asset_id: str):
 
     # Handle scan error
     if "error" in scan_result:
+        update_scan_status(
+            scan_id=scan_id,
+            status="failed",
+            errors=[scan_result["error"]],
+        )
         raise HTTPException(
             status_code=500,
             detail=scan_result["error"]
         )
 
-    # Store violations in memory
+    # Store violations in Supabase (with dedup)
     new_violations = scan_result.get("violations", [])
+    stored_count = 0
     for violation in new_violations:
-        # Avoid duplicate violations in store
-        existing_urls = [v["image_url"] for v in violations_store]
-        if violation["image_url"] not in existing_urls:
-            violations_store.append(violation)
+        if not check_violation_exists(violation["image_url"]):
+            insert_violation(violation, scan_id=scan_id)
+            stored_count += 1
+
+    # Update scan record with results
+    update_scan_status(
+        scan_id=scan_id,
+        status="completed",
+        total_scanned=scan_result.get("urls_scanned", 0),
+        violations_found=scan_result.get("violations_found", 0),
+    )
 
     return JSONResponse(
         status_code=200,
         content={
             "success": True,
             "asset_id": asset_id,
+            "scan_id": scan_id,
             "scan_result": scan_result,
             "message": f"Scan complete! Found {scan_result['violations_found']} violations."
         }
     )
 
+
 @router.get("/violations")
-async def get_violations():
-    """Get all detected violations"""
-
-    # Sort by similarity before returning
-    sorted_violations = sorted(
-        violations_store,
-        key=lambda x: x["clip_similarity"],
-        reverse=True
-    )
-
+async def get_all_violations(severity: str = None):
+    """Get all detected violations, with optional severity filter"""
+    violations = get_violations(severity=severity)
     return {
-        "total": len(sorted_violations),
-        "violations": sorted_violations
+        "total": len(violations),
+        "violations": violations
     }
+
 
 @router.get("/violations/{asset_id}")
 async def get_violations_by_asset(asset_id: str):
     """Get violations for a specific asset"""
-
-    asset_violations = [
-        v for v in violations_store
-        if v["asset_id"] == asset_id
-    ]
-
-    # Sort by similarity
-    asset_violations = sorted(
-        asset_violations,
-        key=lambda x: x["clip_similarity"],
-        reverse=True
-    )
-
+    violations = get_violations(asset_id=asset_id)
     return {
         "asset_id": asset_id,
-        "total": len(asset_violations),
-        "violations": asset_violations
+        "total": len(violations),
+        "violations": violations
     }
 
-@router.delete("/violations/clear")
-async def clear_violations():
-    """Clear all violations from memory"""
-    violations_store.clear()
+
+@router.get("/history")
+async def scan_history(asset_id: str = None):
+    """List all past scans, optionally filtered by asset"""
+    scans = get_scan_history(asset_id=asset_id)
     return {
-        "message": "All violations cleared",
-        "total": 0
+        "total": len(scans),
+        "scans": scans
     }
+
+
+@router.get("/{scan_id}/status")
+async def scan_status(scan_id: str):
+    """Get real-time status of a specific scan"""
+    scan = get_scan_by_id(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return scan
