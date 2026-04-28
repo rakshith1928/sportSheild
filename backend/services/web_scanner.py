@@ -85,7 +85,7 @@ async def scan_google_for_asset(
 
         # Handle empty results safely
         items = result.get("items", []) or []
-        print(f"📸 Found {len(items)} images to scan")
+        print(f"Found {len(items)} images to scan")
 
         #Build parallel download tasks
         tasks = []
