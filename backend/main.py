@@ -10,21 +10,29 @@ load_dotenv()
 from routers import upload, scan, explain, report
 from services.rag_engine import init_rag
 from services.fingerprint import init_clip_model
+from services.database import get_supabase_client
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 Starting SportShield AI...")
+    print("Starting SportShield AI...")
     os.makedirs(os.getenv("UPLOAD_DIR", "uploads"), exist_ok=True)
     os.makedirs("chroma_db", exist_ok=True)
-    print("📦 Loading CLIP model...")
+    print("Loading CLIP model...")
     init_clip_model()
-    print("📚 Initializing RAG knowledge base...")
+    print("Initializing RAG knowledge base...")
     init_rag()
-    print("✅ SportShield AI ready!")
+    print("Connecting to Supabase...")
+    try:
+        get_supabase_client()
+        print("Supabase connected!")
+    except Exception as e:
+        print(f"Supabase connection failed: {e}")
+        print("  Backend will work but data won't persist across restarts.")
+    print("SportShield AI ready!")
     yield
     # Shutdown
-    print("👋 Shutting down SportShield AI...")
+    print("Shutting down SportShield AI...")
 
 app = FastAPI(
     title="SportShield AI",

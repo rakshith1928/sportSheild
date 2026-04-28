@@ -11,6 +11,7 @@ from services.fingerprint import (
     get_all_assets,
     compare_image_to_db
 )
+from services.database import insert_asset as db_insert_asset, get_assets as db_get_assets
 
 router = APIRouter()
 
@@ -110,6 +111,14 @@ async def upload_asset(
                 detail=f"Image error: {result['error']}"
             )
 
+        # Step 8 — Dual-write to Supabase
+        metadata["file_url"] = f"/uploads/{filename}"
+        metadata["phash"] = result.get("phash")
+        try:
+            db_insert_asset(metadata)
+        except Exception as db_err:
+            print(f"Supabase insert failed (non-fatal): {db_err}")
+
         # Success
         return JSONResponse(
             status_code=200,
@@ -137,8 +146,10 @@ async def upload_asset(
 @router.get("/assets")
 async def list_assets():
     """List all protected assets"""
-    assets = get_all_assets()
-    return {
-        "total": len(assets),
-        "assets": assets
-    }
+    try:
+        assets = db_get_assets()
+        return {"total": len(assets), "assets": assets}
+    except Exception:
+        # Fallback to ChromaDB if Supabase is down
+        assets = get_all_assets()
+        return {"total": len(assets), "assets": assets}

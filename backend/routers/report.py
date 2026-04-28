@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from services.report_generator import generate_report
 from services.rag_engine import explain_violation  #RAG integration
+from services.database import insert_report as db_insert_report, get_reports as db_get_reports
 import chromadb
 import uuid
 import os
@@ -73,6 +74,18 @@ async def generate_violation_report(request: ReportRequest):
             output_dir=REPORTS_DIR
         )
 
+        # Store report metadata in Supabase
+        try:
+            db_insert_report({
+                "report_id": report_id,
+                "asset_id": request.asset_id,
+                "violations_analyzed": len(enriched_violations),
+                "file_path": file_path,
+                "download_url": f"/report/download/{report_id}",
+            })
+        except Exception as db_err:
+            print(f"Supabase report insert failed (non-fatal): {db_err}")
+
         return {
             "success": True,
             "report_id": report_id,
@@ -109,18 +122,21 @@ async def download_report(report_id: str):
 @router.get("/list")
 async def list_reports():
     """List all generated reports"""
-
-    os.makedirs(REPORTS_DIR, exist_ok=True)
-    files = [f for f in os.listdir(REPORTS_DIR) if f.endswith(".pdf")]
-
-    return {
-        "total": len(files),
-        "reports": [
-            {
-                "report_id": f.replace(".pdf", ""),
-                "download_url": f"/report/download/{f.replace('.pdf', '')}",
-                "filename": f
-            }
-            for f in sorted(files, reverse=True)
-        ]
-    }
+    try:
+        reports = db_get_reports()
+        return {"total": len(reports), "reports": reports}
+    except Exception:
+        # Fallback to filesystem if Supabase is down
+        os.makedirs(REPORTS_DIR, exist_ok=True)
+        files = [f for f in os.listdir(REPORTS_DIR) if f.endswith(".pdf")]
+        return {
+            "total": len(files),
+            "reports": [
+                {
+                    "report_id": f.replace(".pdf", ""),
+                    "download_url": f"/report/download/{f.replace('.pdf', '')}",
+                    "filename": f
+                }
+                for f in sorted(files, reverse=True)
+            ]
+        }
