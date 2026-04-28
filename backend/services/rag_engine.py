@@ -116,14 +116,16 @@ def query_rag(query: str, k: int = 3, law_filter: str = None) -> list:
     return filtered
 
 
-
 def explain_violation(violation: dict) -> dict:
     """Use RAG + Groq LLM to explain a violation and recommend legal actions"""
 
     similarity = violation.get("clip_similarity", 0)
     is_copy = violation.get("is_likely_copy", False)
 
-    # 6️⃣ FIX: Better severity logic using is_likely_copy
+    # 4️⃣ FIX: Confidence score
+    confidence = round(similarity * 100, 2)
+
+    # Severity logic
     if similarity > 0.92 and is_copy:
         severity = "HIGH"
     elif similarity > 0.85:
@@ -131,7 +133,7 @@ def explain_violation(violation: dict) -> dict:
     else:
         severity = "LOW"
 
-    # 2️⃣ FIX: Richer query for better RAG retrieval
+    # Rich query for better retrieval
     query = f"""
     sports copyright infringement
     unauthorized broadcasting
@@ -142,35 +144,44 @@ def explain_violation(violation: dict) -> dict:
     source url {violation.get('page_url', '')}
     """
 
-    # Get relevant legal context
-    legal_context = query_rag(query)
+    # 3️⃣ FIX: Use targeted law filter based on severity
+    # HIGH violations → check DMCA first (faster takedowns)
+    # others → search all laws
+    law_filter = "dmca" if severity == "HIGH" else None
+    legal_context = query_rag(query, k=3, law_filter=law_filter)
 
-    # 3️⃣ FIX: Limit context to avoid token explosion
+    # 3️⃣ FIX: If filtered retrieval returned nothing, fall back to unfiltered
+    if not legal_context:
+        print("⚠️ Filtered search returned nothing — falling back to unfiltered")
+        legal_context = query_rag(query, k=3)
+
+    # Limit context size
     legal_context = legal_context[:2]
 
     if not legal_context:
         context_text = "No specific legal context found."
     else:
         context_text = "\n\n".join([
-            f"[{ctx['source']}]:\n{ctx['content']}"
+            f"[{ctx['source']} | relevance: {ctx['relevance_score']}]:\n{ctx['content']}"
             for ctx in legal_context
         ])
 
-    # 7️⃣ FIX: Fallback if Groq not configured
+    # Fallback if Groq not configured
     if groq_client is None:
         return {
             "explanation": _fallback_explanation(severity),
             "severity": severity,
+            "confidence": confidence,
             "legal_context": legal_context,
             "recommended_action": get_recommended_action(severity)
         }
 
-    # 4️⃣ + 5️⃣ FIX: Grounded prompt with structured output format
+    # Grounded prompt with structured output
     prompt = f"""You are a legal advisor specializing in digital media copyright and sports broadcasting rights.
 
 A potential copyright violation has been detected:
 - Page URL: {violation.get('page_url', 'Unknown')}
-- Similarity Score: {similarity} (0-1 scale, higher = more similar)
+- Similarity Score: {similarity} ({confidence}% confidence)
 - Severity: {severity}
 - Is Likely Copy: {is_copy}
 - Detected At: {violation.get('detected_at', 'Unknown')}
@@ -215,7 +226,6 @@ Takedown Process:
         )
         explanation = response.choices[0].message.content
 
-    # 7️⃣ FIX: Structured fallback if Groq call fails
     except Exception as e:
         print(f"⚠️ Groq call failed: {e}")
         explanation = _fallback_explanation(severity)
@@ -223,10 +233,10 @@ Takedown Process:
     return {
         "explanation": explanation,
         "severity": severity,
+        "confidence": confidence,
         "legal_context": legal_context,
         "recommended_action": get_recommended_action(severity)
     }
-
 
 def _fallback_explanation(severity: str) -> str:
     """Structured fallback explanation when LLM is unavailable"""
