@@ -1,189 +1,262 @@
+"use client"
+
+import React, { useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Shield, Globe, Zap, CheckCircle2 } from 'lucide-react'
 
 export default function LandingPage() {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('active')
+          }
+        })
+      },
+      { threshold: 0.1 }
+    )
+
+    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el))
+
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
-      {/* Header */}
-      <header className="flex items-center justify-between px-8 py-6 max-w-7xl w-full mx-auto">
-        <div className="flex items-center gap-2">
-          <Shield className="w-8 h-8 text-primary" />
-          <span className="text-xl font-bold tracking-tight">SportShield AI</span>
-        </div>
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
-          <Link href="#solutions" className="hover:text-foreground transition-colors">Solutions</Link>
-          <Link href="#technology" className="hover:text-foreground transition-colors">Technology</Link>
-          <Link href="#compliance" className="hover:text-foreground transition-colors">Compliance</Link>
-        </nav>
-        <div className="flex items-center gap-4">
-          <Link href="/login" className="text-sm font-medium hover:text-primary transition-colors">
-            Log in
-          </Link>
-          <Link 
-            href="/signup" 
-            className="text-sm font-medium px-4 py-2 rounded-md border border-border hover:bg-card transition-colors"
-          >
-            Sign up
-          </Link>
-        </div>
-      </header>
+    <>
+      <style dangerouslySetInnerHTML={{__html: `
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .coral-accent { color: #FF6B6B; }
+        .bg-coral-accent { background-color: #FF6B6B; }
+        .border-coral-accent { border-color: #FF6B6B; }
+        
+        @keyframes slide-infinite {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .animate-carousel {
+            display: flex;
+            width: max-content;
+            animation: slide-infinite 40s linear infinite;
+        }
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+      `}} />
+      
+      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
 
-      <main className="flex-1 flex flex-col items-center">
-        {/* Hero Section */}
-        <section className="w-full max-w-5xl mx-auto px-6 py-24 md:py-32 flex flex-col items-center text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-            Active Monitoring Online
-          </div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
-            Securing the Future of <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-              Global Sports Rights
-            </span>
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mb-10 leading-relaxed">
-            Combat piracy and protect your digital assets with autonomous AI fingerprinting 
-            and real-time automated takedown protocols.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <Link 
-              href="/dashboard" 
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-md font-medium text-lg hover:bg-primary/90 transition-all shadow-[0_0_20px_rgba(255,107,107,0.3)] hover:shadow-[0_0_30px_rgba(255,107,107,0.5)]"
-            >
-              Enter Command Center <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link 
-              href="#contact" 
-              className="px-8 py-4 rounded-md font-medium text-lg border border-border hover:bg-card transition-colors"
-            >
-              View Documentation
+      <div className="bg-[#0B0E14] text-slate-200 selection:bg-[#FF6B6B] selection:text-white min-h-screen flex flex-col font-sans">
+        {/* TopNavBar */}
+        <header className="bg-[#0B0E14]/80 backdrop-blur-md w-full top-0 z-50 border-b border-white/5 sticky">
+          <div className="flex justify-between items-center w-full px-6 py-4 max-w-screen-2xl mx-auto tracking-tight">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#FF6B6B] text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>shield</span>
+              <span className="text-xl font-bold text-white uppercase tracking-wider">SportShield AI</span>
+            </div>
+            <nav className="hidden md:flex items-center gap-8">
+              <Link href="#" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-all duration-300">Solutions</Link>
+              <Link href="#" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-all duration-300">Technology</Link>
+              <Link href="#" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-all duration-300">Compliance</Link>
+              <Link href="#" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-all duration-300">Pricing</Link>
+            </nav>
+            <Link href="/dashboard" className="bg-[#FF6B6B] text-white px-6 py-2 rounded-lg font-bold hover:scale-105 active:scale-95 transform transition-all duration-300">
+              Request Demo
             </Link>
           </div>
-        </section>
+        </header>
 
-        {/* Stats Section */}
-        <section className="w-full border-y border-border bg-card/50">
-          <div className="max-w-7xl mx-auto px-6 py-12">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-border/50">
-              <div className="flex flex-col items-center text-center">
-                <span className="text-4xl font-bold text-primary mb-2">99.8%</span>
-                <span className="text-sm font-medium text-muted-foreground">Detection Rate</span>
+        <main className="flex-1">
+          {/* Hero Section */}
+          <section className="relative pt-24 pb-48 overflow-hidden bg-[#0B0E14]">
+            <div className="max-w-7xl mx-auto px-6 text-center">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#901822]/20 border border-[#901822]/30 mb-8">
+                <span className="w-2 h-2 rounded-full bg-coral-accent animate-pulse"></span>
+                <span className="text-[12px] font-semibold tracking-wider text-[#ffb3b0] uppercase">Enterprise Grade Intelligence</span>
               </div>
-              <div className="flex flex-col items-center text-center">
-                <span className="text-4xl font-bold text-foreground mb-2">12s</span>
-                <span className="text-sm font-medium text-muted-foreground">Avg Response Time</span>
-              </div>
-              <div className="flex flex-col items-center text-center">
-                <span className="text-4xl font-bold text-foreground mb-2">4M+</span>
-                <span className="text-sm font-medium text-muted-foreground">Daily Scans</span>
-              </div>
-              <div className="flex flex-col items-center text-center">
-                <span className="text-4xl font-bold text-foreground mb-2">$2B+</span>
-                <span className="text-sm font-medium text-muted-foreground">Revenue Protected</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section className="w-full max-w-7xl mx-auto px-6 py-24" id="solutions">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Command Center Capabilities</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Integrated security tools built for the modern digital rights landscape.
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="bg-card border border-border p-8 rounded-xl hover:border-primary/50 transition-colors group">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">AI Fingerprinting</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Inject invisible, forensic watermarks into every stream to trace leaks back to the precise subscriber source within seconds.
+              <h1 className="text-4xl md:text-7xl font-bold text-white mb-8 max-w-5xl mx-auto leading-tight tracking-tight">
+                Securing the Future of <span className="coral-accent">Global Sports Rights</span>
+              </h1>
+              <p className="text-lg text-slate-400 mb-12 max-w-2xl mx-auto leading-relaxed">
+                Combat piracy and protect your digital assets with autonomous AI fingerprinting and real-time automated takedown protocols.
               </p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="bg-card border border-border p-8 rounded-xl hover:border-primary/50 transition-colors group">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Globe className="w-6 h-6 text-primary" />
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-24">
+                <button className="bg-coral-accent text-white px-10 py-5 rounded-xl font-bold text-lg hover:shadow-[0_0_30px_rgba(255,107,107,0.3)] transition-all">Start Free Audit</button>
+                <button className="bg-transparent border border-slate-700 text-white px-10 py-5 rounded-xl font-bold text-lg hover:bg-slate-800 transition-all">View Case Studies</button>
               </div>
-              <h3 className="text-xl font-bold mb-3">Global Web Scanning</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Autonomous spiders scan indexed sites, social media, and pirate IPTV networks 24/7 to identify illegal re-broadcasts.
-              </p>
-            </div>
 
-            {/* Feature 3 */}
-            <div className="bg-card border border-border p-8 rounded-xl hover:border-primary/50 transition-colors group">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Zap className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">Automated Takedowns</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Instantly trigger DMCA notices and ISP block requests. AI-driven legal protocols resolve threats without human intervention.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Visual Control Highlight */}
-        <section className="w-full max-w-7xl mx-auto px-6 py-12 mb-24 flex flex-col md:flex-row items-center gap-12">
-          <div className="flex-1">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">Total Visual Control</h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Manage your entire IP portfolio from a single, unified command center designed for rapid decision-making.
-            </p>
-            <ul className="space-y-4">
-              <li className="flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-success" />
-                <span className="font-medium">Real-time heatmaps of pirate activity</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-success" />
-                <span className="font-medium">One-click legal escalation</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-success" />
-                <span className="font-medium">Comprehensive audit trails for litigation</span>
-              </li>
-            </ul>
-          </div>
-          <div className="flex-1 w-full bg-card border border-border rounded-xl p-8 relative overflow-hidden h-[400px] flex items-center justify-center shadow-lg">
-             {/* Abstract Dashboard representation since we don't have the image file */}
-             <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary via-background to-background"></div>
-             <Shield className="w-32 h-32 text-primary opacity-20 absolute" />
-             <div className="relative z-10 text-center">
-                <div className="text-2xl font-bold text-muted-foreground mb-2">Live Telemetry</div>
-                <div className="flex gap-2 justify-center mt-4">
-                  <div className="w-2 h-16 bg-primary rounded-full animate-pulse"></div>
-                  <div className="w-2 h-24 bg-success rounded-full animate-pulse delay-75"></div>
-                  <div className="w-2 h-12 bg-primary rounded-full animate-pulse delay-150"></div>
-                  <div className="w-2 h-32 bg-accent rounded-full animate-pulse delay-300"></div>
-                  <div className="w-2 h-20 bg-success rounded-full animate-pulse delay-500"></div>
+              {/* Modern Feature Showcase around Hero Image */}
+              <div className="relative max-w-7xl mx-auto px-4 md:px-0 mt-28 overflow-hidden">
+                <div className="animate-carousel">
+                  {/* Original set */}
+                  <div className="flex gap-6 pr-6">
+                    <div className="relative w-[400px] shrink-0">
+                      <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
+                        <img alt="High-performance sports action" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/footbal.jpg" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                      </div>
+                    </div>
+                    <div className="relative w-[400px] shrink-0">
+                      <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
+                        <img alt="Stadium Action" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/GettyImages-2219813002.jpg.webp" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                      </div>
+                    </div>
+                    <div className="relative w-[400px] shrink-0">
+                      <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
+                        <img alt="Championship Celebration" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/cn6ocva_perth-scorchers-bbl-2023-afp_625x300_04_February_23%20(1).webp" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Duplicated set for seamless loop */}
+                  <div className="flex gap-6 pr-6">
+                    <div className="relative w-[400px] shrink-0">
+                      <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
+                        <img alt="High-performance sports action" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/footbal.jpg" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                      </div>
+                    </div>
+                    <div className="relative w-[400px] shrink-0">
+                      <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
+                        <img alt="Stadium Action" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/GettyImages-2219813002.jpg.webp" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                      </div>
+                    </div>
+                    <div className="relative w-[400px] shrink-0">
+                      <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
+                        <img alt="Championship Celebration" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/cn6ocva_perth-scorchers-bbl-2023-afp_625x300_04_February_23%20(1).webp" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-             </div>
-          </div>
-        </section>
-      </main>
+              </div>
+            </div>
+          </section>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-border py-8 text-center text-sm text-muted-foreground">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p>© 2026 SportShield AI. Secure Intelligence for Global Sports.</p>
-          <div className="flex gap-6">
-            <Link href="#" className="hover:text-foreground">Privacy Policy</Link>
-            <Link href="#" className="hover:text-foreground">Terms of Service</Link>
-            <Link href="#" className="hover:text-foreground">Security</Link>
+          {/* Features Bento Grid */}
+          <section className="py-24 bg-[#0c0f10]">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="text-center mb-16 reveal">
+                <h2 className="text-3xl font-bold text-white mb-4">Command Center Capabilities</h2>
+                <p className="text-slate-400 text-lg">Integrated security tools for the modern digital rights landscape.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-[#1d2021] p-6 rounded-xl border border-slate-800/50 hover:border-[#FF6B6B]/50 transition-colors group reveal">
+                  <div className="w-12 h-12 rounded-lg bg-[#FF6B6B]/10 flex items-center justify-center mb-6 group-hover:bg-[#FF6B6B]/20 transition-colors">
+                    <span className="material-symbols-outlined coral-accent" style={{ fontVariationSettings: "'FILL' 1" }}>fingerprint</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">AI Fingerprinting</h3>
+                  <p className="text-sm text-slate-400 mb-6">Inject invisible, forensic watermarks into every stream to trace leaks back to the precise subscriber source within seconds.</p>
+                  <div className="flex items-center text-[#FF6B6B] font-bold gap-1 cursor-pointer hover:gap-2 transition-all">
+                    Learn more <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </div>
+                </div>
+                <div className="bg-[#1d2021] p-6 rounded-xl border border-slate-800/50 hover:border-[#FF6B6B]/50 transition-colors group reveal">
+                  <div className="w-12 h-12 rounded-lg bg-[#FF6B6B]/10 flex items-center justify-center mb-6 group-hover:bg-[#FF6B6B]/20 transition-colors">
+                    <span className="material-symbols-outlined coral-accent" style={{ fontVariationSettings: "'FILL' 1" }}>travel_explore</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Global Web Scanning</h3>
+                  <p className="text-sm text-slate-400 mb-6">Autonomous spiders scan indexed sites, social media, and pirate IPTV networks 24/7 to identify illegal re-broadcasts.</p>
+                  <div className="flex items-center text-[#FF6B6B] font-bold gap-1 cursor-pointer hover:gap-2 transition-all">
+                    Learn more <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </div>
+                </div>
+                <div className="bg-[#1d2021] p-6 rounded-xl border border-slate-800/50 hover:border-[#FF6B6B]/50 transition-colors group reveal">
+                  <div className="w-12 h-12 rounded-lg bg-[#FF6B6B]/10 flex items-center justify-center mb-6 group-hover:bg-[#FF6B6B]/20 transition-colors">
+                    <span className="material-symbols-outlined coral-accent" style={{ fontVariationSettings: "'FILL' 1" }}>gavel</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">Automated Takedowns</h3>
+                  <p className="text-sm text-slate-400 mb-6">Instantly trigger DMCA notices and ISP block requests. AI-driven legal protocols resolve threats without human intervention.</p>
+                  <div className="flex items-center text-[#FF6B6B] font-bold gap-1 cursor-pointer hover:gap-2 transition-all">
+                    Learn more <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Stats Section */}
+          <section className="py-20 bg-[#0B0E14]">
+            <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div className="text-center">
+                <p className="text-4xl font-bold text-white">99.8%</p>
+                <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase mt-2">Detection Rate</p>
+              </div>
+              <div className="text-center">
+                <p className="text-4xl font-bold text-white">12s</p>
+                <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase mt-2">Avg Response Time</p>
+              </div>
+              <div className="text-center">
+                <p className="text-4xl font-bold text-white">4M+</p>
+                <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase mt-2">Daily Scans</p>
+              </div>
+              <div className="text-center">
+                <p className="text-4xl font-bold text-white">$2B+</p>
+                <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase mt-2">Revenue Protected</p>
+              </div>
+            </div>
+          </section>
+
+          {/* Dashboard Preview Banner */}
+          <section className="py-24 bg-[#0c0f10] border-y border-slate-800">
+            <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-12">
+              <div className="flex-1 reveal">
+                <h2 className="text-4xl font-bold text-white mb-6">Total Visual Control</h2>
+                <p className="text-lg text-slate-400 mb-8">Manage your entire IP portfolio from a single, unified command center designed for rapid decision-making.</p>
+                <ul className="space-y-4">
+                  <li className="flex items-center gap-3 text-white">
+                    <span className="material-symbols-outlined coral-accent">check_circle</span>
+                    Real-time heatmaps of pirate activity
+                  </li>
+                  <li className="flex items-center gap-3 text-white">
+                    <span className="material-symbols-outlined coral-accent">check_circle</span>
+                    One-click legal escalation
+                  </li>
+                  <li className="flex items-center gap-3 text-white">
+                    <span className="material-symbols-outlined coral-accent">check_circle</span>
+                    Comprehensive audit trails for litigation
+                  </li>
+                </ul>
+              </div>
+              <div className="flex-1 w-full reveal">
+                <div className="rounded-xl overflow-hidden border border-slate-800 shadow-2xl bg-[#111415]">
+                  <img alt="Command Center Dashboard" className="w-full h-full object-cover" src="/images/Screenshot%202026-05-01%20125331.png" />
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        {/* Footer */}
+        <footer className="bg-[#0B0E14] w-full border-t border-slate-800/50">
+          <div className="flex flex-col md:flex-row justify-between items-center w-full px-8 py-12 gap-6 max-w-screen-2xl mx-auto text-sm">
+            <div className="flex flex-col gap-4">
+              <span className="text-lg font-black text-white">SportShield AI</span>
+              <p className="text-slate-400 max-w-xs">© 2026 SportShield AI. Secure Intelligence for Global Sports.</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-8">
+              <Link href="#" className="text-slate-500 hover:text-white transition-colors">Privacy Policy</Link>
+              <Link href="#" className="text-slate-500 hover:text-white transition-colors">Terms of Service</Link>
+              <Link href="#" className="text-slate-500 hover:text-white transition-colors">Security</Link>
+              <Link href="#" className="text-slate-500 hover:text-white transition-colors">Contact</Link>
+            </div>
+            <div className="flex gap-4">
+              <span className="material-symbols-outlined text-slate-500 hover:text-white cursor-pointer transition-colors">public</span>
+              <span className="material-symbols-outlined text-slate-500 hover:text-white cursor-pointer transition-colors">security</span>
+              <span className="material-symbols-outlined text-slate-500 hover:text-white cursor-pointer transition-colors">analytics</span>
+            </div>
           </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </>
   )
 }
