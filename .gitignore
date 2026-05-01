@@ -36,3 +36,5 @@ logs/
 # Model cache
 .cache/
 models/
+
+.agents
