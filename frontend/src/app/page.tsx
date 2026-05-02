@@ -67,8 +67,8 @@ export default function LandingPage() {
               <Link href="#" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-all duration-300">Compliance</Link>
               <Link href="#" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-all duration-300">Pricing</Link>
             </nav>
-            <Link href="/dashboard" className="bg-[#FF6B6B] text-white px-6 py-2 rounded-lg font-bold hover:scale-105 active:scale-95 transform transition-all duration-300">
-              Request Demo
+            <Link href="/login" className="bg-[#FF6B6B] text-white px-6 py-2 rounded-lg font-bold hover:scale-105 active:scale-95 transform transition-all duration-300">
+              Sign In
             </Link>
           </div>
         </header>
@@ -88,7 +88,7 @@ export default function LandingPage() {
                 Combat piracy and protect your digital assets with autonomous AI fingerprinting and real-time automated takedown protocols.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-24">
-                <button className="bg-coral-accent text-white px-10 py-5 rounded-xl font-bold text-lg hover:shadow-[0_0_30px_rgba(255,107,107,0.3)] transition-all">Start Free Audit</button>
+                <Link href="/login" className="bg-coral-accent text-white px-10 py-5 rounded-xl font-bold text-lg hover:shadow-[0_0_30px_rgba(255,107,107,0.3)] transition-all flex items-center justify-center">Start Free Audit</Link>
                 <button className="bg-transparent border border-slate-700 text-white px-10 py-5 rounded-xl font-bold text-lg hover:bg-slate-800 transition-all">View Case Studies</button>
               </div>
 
