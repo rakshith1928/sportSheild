@@ -15,33 +15,56 @@ export default function AuthForm() {
   const supabase = createClient()
 
   const handleAuth = async (isSignUp: boolean) => {
-    setLoading(true)
     setError(null)
     setMessage(null)
+
+    // Fix #4 — client-side validation before hitting Supabase
+    if (!email || !password) {
+      setError('Email and password are required')
+      return
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+
+    setLoading(true)
     
     try {
       if (isSignUp) {
+        // Fix #1 — production-safe redirect URL
+        const redirectTo = process.env.NEXT_PUBLIC_SITE_URL
+          ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+          : `${window.location.origin}/auth/callback`
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${location.origin}/auth/callback`,
-          },
+          options: { emailRedirectTo: redirectTo },
         })
         if (error) throw error
         setMessage('Success! Please check your email to verify your account.')
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        // Fix #5 — check session before redirecting
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
         if (error) throw error
-        
-        router.push('/dashboard')
-        router.refresh()
+
+        if (data.session) {
+          setMessage('Login successful! Redirecting...')
+          router.push('/dashboard')
+          router.refresh()
+        }
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during authentication')
+    } catch (err: unknown) {
+      // Fix #3 — proper error typing
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Something went wrong. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
