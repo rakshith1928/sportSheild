@@ -23,7 +23,8 @@ export default function LandingPage() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
@@ -50,7 +51,7 @@ export default function LandingPage() {
             transform: translateY(0);
         }
       `}} />
-      
+
       <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
 
       <div className="bg-[#0B0E14] text-slate-200 selection:bg-[#FF6B6B] selection:text-white min-h-screen flex flex-col font-sans">
@@ -99,20 +100,20 @@ export default function LandingPage() {
                   <div className="flex gap-6 pr-6">
                     <div className="relative w-[400px] shrink-0">
                       <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
-                        <img alt="High-performance sports action" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/footbal.jpg" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                        <img alt="High-performance sports action" className="w-full rounded-xl object-cover aspect-video" src="/images/footbal.jpg" />
+                        <div className="absolute inset-0 bg-linear-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
                       </div>
                     </div>
                     <div className="relative w-[400px] shrink-0">
                       <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
-                        <img alt="Stadium Action" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/GettyImages-2219813002.jpg.webp" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                        <img alt="Stadium Action" className="w-full rounded-xl object-cover aspect-video" src="/images/GettyImages-2219813002.jpg.webp" />
+                        <div className="absolute inset-0 bg-linear-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
                       </div>
                     </div>
                     <div className="relative w-[400px] shrink-0">
                       <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
-                        <img alt="Championship Celebration" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/cn6ocva_perth-scorchers-bbl-2023-afp_625x300_04_February_23%20(1).webp" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                        <img alt="Championship Celebration" className="w-full rounded-xl object-cover aspect-video" src="/images/cn6ocva_perth-scorchers-bbl-2023-afp_625x300_04_February_23%20(1).webp" />
+                        <div className="absolute inset-0 bg-linear-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
                       </div>
                     </div>
                   </div>
@@ -120,20 +121,20 @@ export default function LandingPage() {
                   <div className="flex gap-6 pr-6">
                     <div className="relative w-[400px] shrink-0">
                       <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
-                        <img alt="High-performance sports action" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/footbal.jpg" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                        <img alt="High-performance sports action" className="w-full rounded-xl object-cover aspect-video" src="/images/footbal.jpg" />
+                        <div className="absolute inset-0 bg-linear-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
                       </div>
                     </div>
                     <div className="relative w-[400px] shrink-0">
                       <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
-                        <img alt="Stadium Action" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/GettyImages-2219813002.jpg.webp" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                        <img alt="Stadium Action" className="w-full rounded-xl object-cover aspect-video" src="/images/GettyImages-2219813002.jpg.webp" />
+                        <div className="absolute inset-0 bg-linear-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
                       </div>
                     </div>
                     <div className="relative w-[400px] shrink-0">
                       <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-[#191c1d] p-1 group hover:border-[#FF6B6B]/30 transition-all duration-500">
-                        <img alt="Championship Celebration" className="w-full rounded-xl object-cover aspect-[16/9]" src="/images/cn6ocva_perth-scorchers-bbl-2023-afp_625x300_04_February_23%20(1).webp" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
+                        <img alt="Championship Celebration" className="w-full rounded-xl object-cover aspect-video" src="/images/cn6ocva_perth-scorchers-bbl-2023-afp_625x300_04_February_23%20(1).webp" />
+                        <div className="absolute inset-0 bg-linear-to-t from-[#0B0E14]/60 via-transparent to-transparent"></div>
                       </div>
                     </div>
                   </div>

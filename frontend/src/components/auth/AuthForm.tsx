@@ -10,7 +10,7 @@ export default function AuthForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -29,7 +29,7 @@ export default function AuthForm() {
     }
 
     setLoading(true)
-    
+
     try {
       if (isSignUp) {
         // Fix #1 — production-safe redirect URL
@@ -72,7 +72,8 @@ export default function AuthForm() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes auth-fade-up {
           from { opacity: 0; transform: translateY(24px); }
           to { opacity: 1; transform: translateY(0); }
@@ -122,14 +123,14 @@ export default function AuthForm() {
           <span className="material-symbols-outlined text-[#FF6B6B] text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>shield</span>
           <span className="text-xl font-bold text-white uppercase tracking-wider">SportShield AI</span>
         </div>
-        
+
         <h2 className="text-2xl font-bold text-white mb-2 text-center auth-field">
           Welcome Back
         </h2>
         <p className="text-slate-400 text-sm text-center mb-8 auth-field">
           Enter your credentials to access the command center.
         </p>
-        
+
         <div className="space-y-5">
           <div className="auth-field">
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
@@ -141,7 +142,7 @@ export default function AuthForm() {
               placeholder="admin@sportshield.ai"
             />
           </div>
-          
+
           <div className="auth-field">
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
             <input
@@ -181,11 +182,11 @@ export default function AuthForm() {
                 </span>
               ) : 'Sign In'}
             </button>
-            
+
             <div className="relative flex items-center py-2">
-              <div className="flex-grow border-t border-slate-700"></div>
-              <span className="flex-shrink-0 mx-4 text-slate-500 text-xs uppercase tracking-wider">or</span>
-              <div className="flex-grow border-t border-slate-700"></div>
+              <div className="grow border-t border-slate-700"></div>
+              <span className="shrink-0 mx-4 text-slate-500 text-xs uppercase tracking-wider">or</span>
+              <div className="grow border-t border-slate-700"></div>
             </div>
 
             <button
