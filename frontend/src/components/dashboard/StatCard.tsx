@@ -43,60 +43,47 @@ export function StatCard({ label, value, change, trend, icon }: StatCardProps) {
     }
   };
 
-  const getTrendColor = () => {
-    if (trend === 'up') return 'var(--severity-high)';
-    if (trend === 'down') return 'var(--success)';
-    return 'var(--text-secondary)';
+  const getTrendConfig = () => {
+    if (trend === 'up') return { color: '#FF6B6B', bg: 'rgba(255,107,107,0.1)', arrow: '↑' };
+    if (trend === 'down') return { color: '#10B981', bg: 'rgba(16,185,129,0.1)', arrow: '↓' };
+    return { color: '#64748B', bg: 'rgba(100,116,139,0.1)', arrow: '→' };
   };
+
+  const trendConfig = getTrendConfig();
 
   return (
     <div
-      className="rounded-xl p-6"
+      className="rounded-xl p-6 relative overflow-hidden group hover:border-[#FF6B6B]/20 transition-all duration-300"
       style={{
-        backgroundColor: 'var(--surface-white)',
-        border: '1px solid var(--border-color)',
-        boxShadow: 'var(--shadow-sm)'
+        backgroundColor: '#111415',
+        border: '1px solid rgba(255,255,255,0.06)',
       }}
     >
+      {/* Subtle top glow on hover */}
+      <div
+        className="absolute top-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{ background: 'linear-gradient(90deg, transparent, #FF6B6B, transparent)' }}
+      />
+
       <div className="flex items-center justify-between mb-4">
-        <span
-          style={{
-            fontSize: 'var(--text-sm)',
-            fontWeight: 'var(--font-weight-medium)',
-            color: 'var(--text-secondary)'
-          }}
-        >
-          {label}
-        </span>
+        <span className="text-sm font-medium text-slate-400">{label}</span>
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center"
-          style={{
-            backgroundColor: 'var(--surface-gray)',
-            color: 'var(--text-secondary)'
-          }}
+          style={{ backgroundColor: 'rgba(255,107,107,0.12)', color: '#FF6B6B' }}
         >
           {getIcon()}
         </div>
       </div>
+
       <div className="flex items-end justify-between">
-        <span
-          style={{
-            fontSize: 'var(--text-3xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            color: 'var(--text-primary)',
-            lineHeight: 1
-          }}
-        >
+        <span className="text-3xl font-bold text-white" style={{ lineHeight: 1 }}>
           {value}
         </span>
         <span
-          style={{
-            fontSize: 'var(--text-sm)',
-            fontWeight: 'var(--font-weight-medium)',
-            color: getTrendColor()
-          }}
+          className="text-xs font-semibold px-2 py-1 rounded-md"
+          style={{ color: trendConfig.color, backgroundColor: trendConfig.bg }}
         >
-          {change}
+          {trendConfig.arrow} {change}
         </span>
       </div>
     </div>

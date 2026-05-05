@@ -27,6 +27,16 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes stat-fade-up {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .stat-card-anim {
+          opacity: 0;
+          animation: stat-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}} />
 
       {/* Page Header */}
       <div className="flex items-center justify-between">
@@ -44,8 +54,10 @@ export default async function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
+        {stats.map((stat, i) => (
+          <div key={stat.label} className="stat-card-anim" style={{ animationDelay: `${i * 0.08}s` }}>
+            <StatCard {...stat} />
+          </div>
         ))}
       </div>
 
