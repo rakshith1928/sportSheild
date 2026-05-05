@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
+import TopBar from '@/components/dashboard/TopBar'
 
 export default async function DashboardLayout({
   children,
@@ -18,7 +19,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-[#0B0E14] text-slate-200 font-sans">
-      {children}
+      <TopBar userEmail={user.email ?? null} />
+      <main className="max-w-screen-2xl mx-auto px-6 py-8">
+        {children}
+      </main>
     </div>
   )
 }
