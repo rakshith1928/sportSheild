@@ -25,6 +25,13 @@ export default function TopBar({ userEmail }: TopBarProps) {
     ? userEmail.substring(0, 2).toUpperCase()
     : 'AI'
 
+  const navLinks = [
+    { name: 'Overview', href: '/dashboard' },
+    { name: 'Assets', href: '/dashboard/assets' },
+    { name: 'Violations', href: '/dashboard/violations' },
+    { name: 'Reports', href: '/dashboard/reports' },
+  ]
+
   return (
     <header className="bg-[#0B0E14]/90 backdrop-blur-md border-b border-white/5 sticky top-0 z-50">
       <div className="flex justify-between items-center w-full px-6 py-4 max-w-screen-2xl mx-auto">
@@ -44,18 +51,15 @@ export default function TopBar({ userEmail }: TopBarProps) {
 
         {/* Nav Links */}
         <nav className="hidden md:flex items-center gap-8">
-          <Link href="/dashboard" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-colors duration-300">
-            Overview
-          </Link>
-          <Link href="/dashboard/assets" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-colors duration-300">
-            Assets
-          </Link>
-          <Link href="/dashboard/violations" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-colors duration-300">
-            Violations
-          </Link>
-          <Link href="/dashboard/reports" className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-colors duration-300">
-            Reports
-          </Link>
+          {navLinks.map(link => (
+            <Link 
+              key={link.name}
+              href={link.href} 
+              className="text-slate-400 font-medium hover:text-[#FF6B6B] transition-colors duration-300"
+            >
+              {link.name}
+            </Link>
+          ))}
         </nav>
 
         {/* Profile Dropdown */}

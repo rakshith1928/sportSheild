@@ -1,7 +1,13 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
+import type { Metadata } from 'next'
 import TopBar from '@/components/dashboard/TopBar'
+
+export const metadata: Metadata = {
+  title: 'Dashboard | SportShield AI',
+  description: 'Monitor live piracy threats, manage protected assets, and issue takedowns with SportShield AI.',
+}
 
 export default async function DashboardLayout({
   children,
