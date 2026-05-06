@@ -52,6 +52,42 @@ def get_assets() -> list[dict]:
     )
     return result.data or []
 
+def get_dashboard_stats(user_id: str) -> dict:
+    """Fetch aggregate statistics for the dashboard, filtered by user."""
+    client = get_supabase_client()
+    
+    # We use PostgREST join syntax to filter violations, scans, and reports based on the asset owner
+    try:
+        violations = client.table("violations").select("id, assets!inner(owner)", count="exact").eq("assets.owner", user_id).limit(1).execute()
+        total_violations = getattr(violations, "count", 0) or 0
+    except Exception:
+        total_violations = 0
+
+    try:
+        assets = client.table("assets").select("asset_id", count="exact").eq("owner", user_id).limit(1).execute()
+        total_assets = getattr(assets, "count", 0) or 0
+    except Exception:
+        total_assets = 0
+
+    try:
+        scans = client.table("scans").select("id, assets!inner(owner)", count="exact").eq("assets.owner", user_id).limit(1).execute()
+        total_scans = getattr(scans, "count", 0) or 0
+    except Exception:
+        total_scans = 0
+
+    try:
+        reports = client.table("reports").select("report_id, assets!inner(owner)", count="exact").eq("assets.owner", user_id).limit(1).execute()
+        total_reports = getattr(reports, "count", 0) or 0
+    except Exception:
+        total_reports = 0
+
+    return {
+        "active_threats": total_violations,
+        "assets_scanned": total_scans,
+        "assets_protected": total_assets,
+        "takedowns_issued": total_reports
+    }
+
 
 # ─── Scans ─────────────────────────────────────────────────
 def insert_scan(asset_id: str, query_used: str = "") -> dict:
@@ -136,6 +172,38 @@ def get_violations(
         query = query.eq("severity", severity)
     result = query.execute()
     return result.data or []
+
+def get_recent_alerts(user_id: str, limit: int = 5) -> list[dict]:
+    """Fetch the most recent violations for a user's assets, formatted as alerts for the dashboard."""
+    client = get_supabase_client()
+    
+    result = (
+        client.table("violations")
+        .select("*, assets!inner(owner)")
+        .eq("assets.owner", user_id)
+        .order("detected_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    
+    alerts = []
+    for row in result.data or []:
+        # Determine severity based on similarity score
+        sim = row.get("clip_similarity", 0)
+        severity = "high" if sim > 0.9 else "medium" if sim > 0.75 else "low"
+        
+        # Format the date (we will send the ISO string and let frontend format it if needed, or simple mock)
+        alerts.append({
+            "id": row.get("id"),
+            "title": row.get("title") or "Unauthorized distribution detected",
+            "source": row.get("page_url"),
+            "time": row.get("detected_at"),
+            "severity": severity,
+            "status": "New"
+        })
+        
+    return alerts
+
 def check_violation_exists(image_url: str) -> bool:
     """Check if a violation with this image_url already exists (dedup)."""
     client = get_supabase_client()

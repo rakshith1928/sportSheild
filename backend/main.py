@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from routers import upload, scan, explain, report
+from routers import upload, scan, explain, report, dashboard
 from services.rag_engine import init_rag
 from services.fingerprint import init_clip_model
 from services.database import get_supabase_client
@@ -61,6 +61,7 @@ app.include_router(upload.router, prefix="/upload", tags=["Upload"])
 app.include_router(scan.router, prefix="/scan", tags=["Scan"])
 app.include_router(explain.router, prefix="/explain", tags=["Explain"])
 app.include_router(report.router, prefix="/report", tags=["Report"])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 
 @app.get("/")
 async def root():

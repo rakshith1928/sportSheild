@@ -4,11 +4,13 @@ from services.web_scanner import scan_google_for_asset
 from services.database import (
     insert_scan, update_scan_status, insert_violation,
     get_violations, check_violation_exists,
-    get_scan_history, get_scan_by_id,
+    get_scan_history, get_scan_by_id, get_recent_alerts
 )
 import chromadb
 import asyncio
 import os
+from fastapi import Depends
+from dependencies import get_current_user
 
 router = APIRouter()
 
@@ -105,6 +107,12 @@ async def get_all_violations(severity: str = None):
         "total": len(violations),
         "violations": violations
     }
+
+@router.get("/alerts")
+async def get_alerts(limit: int = 5, user = Depends(get_current_user)):
+    """Get the most recent alerts (violations) for the dashboard"""
+    alerts = get_recent_alerts(user_id=user.id, limit=limit)
+    return alerts
 
 
 @router.get("/violations/{asset_id}")
