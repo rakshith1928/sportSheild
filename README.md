@@ -1,7 +1,7 @@
 # 🛡️ SportShield AI
 ### Enterprise-grade Digital Asset Protection for Sports Media using AI Fingerprinting
 
-> Built for mostly learning 
+> Built for mostly learning and part time hobby
 
 [![Next.js](https://img.shields.io/badge/Frontend-Next.js%2015-black?logo=next.js)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
