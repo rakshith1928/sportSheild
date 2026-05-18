@@ -3,27 +3,24 @@ import { createClient } from '@/utils/supabase/server'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { AlertRow } from '@/components/dashboard/AlertRow'
 import { SeverityBadge } from '@/components/dashboard/SeverityBadge'
-
-// Static data — will be replaced with live API calls in Phase 4
-const stats = [
-  { label: 'Active Threats', value: '24', change: '+3 today', trend: 'up' as const, icon: 'alert' as const },
-  { label: 'Assets Scanned', value: '1,284', change: '+128 this week', trend: 'up' as const, icon: 'scan' as const },
-  { label: 'Assets Protected', value: '347', change: '+12 this week', trend: 'down' as const, icon: 'shield' as const },
-  { label: 'Takedowns Issued', value: '89', change: '+5 today', trend: 'down' as const, icon: 'lock' as const },
-]
-
-const alerts = [
-  { id: 1, title: 'Unauthorized broadcast of Champions League highlight reel', source: 'streamhub.net', time: '2 min ago', severity: 'high' as const, status: 'New' },
-  { id: 2, title: 'Premier League match clip reposted without license', source: 'vidshare.co', time: '18 min ago', severity: 'high' as const, status: 'New' },
-  { id: 3, title: 'Team logo used in unauthorized merchandise listing', source: 'shopify-store-2891.com', time: '1 hr ago', severity: 'medium' as const, status: 'Under Review' },
-  { id: 4, title: 'Stadium photo used in news article without attribution', source: 'localnews.in', time: '3 hrs ago', severity: 'low' as const, status: 'Acknowledged' },
-  { id: 5, title: 'Match replay segment found on social media', source: 'twitter.com', time: '5 hrs ago', severity: 'medium' as const, status: 'Under Review' },
-]
+import { getDashboardStats, getRecentAlerts } from '@/utils/api'
 
 export default async function DashboardPage() {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Phase 4: Fetch live data from FastAPI (which checks Supabase with Tenant Isolation)
+  const apiStats = await getDashboardStats()
+  const alerts = await getRecentAlerts()
+
+  // Map the raw API stats to the UI format expected by StatCard
+  const stats = [
+    { label: 'Active Threats', value: apiStats?.active_threats?.toString() || '0', change: 'Live', trend: 'up' as const, icon: 'alert' as const },
+    { label: 'Assets Scanned', value: apiStats?.assets_scanned?.toString() || '0', change: 'Live', trend: 'up' as const, icon: 'scan' as const },
+    { label: 'Assets Protected', value: apiStats?.assets_protected?.toString() || '0', change: 'Live', trend: 'down' as const, icon: 'shield' as const },
+    { label: 'Takedowns Issued', value: apiStats?.takedowns_issued?.toString() || '0', change: 'Live', trend: 'down' as const, icon: 'lock' as const },
+  ]
 
   return (
     <div className="space-y-8">
@@ -86,13 +83,19 @@ export default async function DashboardPage() {
         </div>
 
         <div>
-          {alerts.map((alert, index) => (
-            <AlertRow
-              key={alert.id}
-              alert={alert}
-              isLast={index === alerts.length - 1}
-            />
-          ))}
+          {alerts.length > 0 ? (
+            alerts.map((alert: any, index: number) => (
+              <AlertRow
+                key={alert.id}
+                alert={alert}
+                isLast={index === alerts.length - 1}
+              />
+            ))
+          ) : (
+            <div className="text-center py-8 text-slate-500 text-sm">
+              No recent alerts detected. Your assets are secure.
+            </div>
+          )}
         </div>
       </div>
 
