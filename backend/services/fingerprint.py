@@ -4,30 +4,32 @@ import numpy as np
 import chromadb
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from transformers import CLIPProcessor, CLIPModel
 import torch
 import cv2
-from typing import Optional
+from typing import Optional, Any, cast
 
 # Global variables
-clip_model = None
-clip_processor = None
+_clip_model: Optional[Any] = None
+_clip_processor: Optional[Any] = None
 chroma_client = None
 asset_collection = None
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def init_clip_model():
-    global clip_model, clip_processor, chroma_client, asset_collection
-
+    global _clip_model, _clip_processor, chroma_client, asset_collection
+ 
     print(f"🖥️ Using device: {device}")
     print("Loading CLIP model...")
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-
+    # Use cast to satisfy linter if it's confused about Transformers types
+    _clip_model = cast(Any, CLIPModel).from_pretrained("openai/clip-vit-base-patch32")
+    _clip_processor = cast(Any, CLIPProcessor).from_pretrained("openai/clip-vit-base-patch32")
+ 
     # 3️⃣ GPU optimization
-    clip_model.to(device)
-    clip_model.eval()
+    if _clip_model:
+        _clip_model.to(device)
+        _clip_model.eval()
 
     # Init ChromaDB
     chroma_client = chromadb.PersistentClient(
@@ -41,14 +43,17 @@ def init_clip_model():
 
 def get_clip_embedding(image: Image.Image) -> list:
     """Get CLIP embedding for image"""
+    if _clip_processor is None or _clip_model is None:
+        return []
+        
     # 3️⃣ GPU optimization
-    inputs = clip_processor(
+    inputs = _clip_processor(
         images=image,
         return_tensors="pt"
     ).to(device)
 
     with torch.no_grad():
-        embedding = clip_model.get_image_features(**inputs)
+        embedding = _clip_model.get_image_features(**inputs)
 
     embedding = embedding / embedding.norm(dim=-1, keepdim=True)
     return embedding.squeeze().tolist()
@@ -76,19 +81,20 @@ def fingerprint_image(image_path: str, metadata: dict) -> dict:
     clip_embedding = get_clip_embedding(image)
 
     # Store in ChromaDB
-    asset_collection.upsert(
-        ids=[asset_id],
-        embeddings=[clip_embedding],
-        metadatas=[{
-            **metadata,
-            "phash": phash,
-            "asset_id": asset_id,
-            "image_path": image_path,
-            "fingerprinted_at": datetime.utcnow().isoformat(),
-            "type": "image"
-        }],
-        documents=[f"Sports asset: {metadata.get('description', '')}"]
-    )
+    if asset_collection:
+        asset_collection.upsert(
+            ids=[asset_id],
+            embeddings=[clip_embedding],
+            metadatas=[{
+                **metadata,
+                "phash": phash,
+                "asset_id": asset_id,
+                "image_path": image_path,
+                "fingerprinted_at": datetime.now(timezone.utc).isoformat(),
+                "type": "image"
+            }],
+            documents=[f"Sports asset: {metadata.get('description', '')}"]
+        )
 
     return {
         "asset_id": asset_id,
@@ -96,10 +102,10 @@ def fingerprint_image(image_path: str, metadata: dict) -> dict:
         "duplicate": False,
         "stored_in_db": True,
         "device_used": device,
-        "total_assets": asset_collection.count()
+        "total_assets": asset_collection.count() if asset_collection else 0
     }
 
-def compare_image_to_db(image: Image.Image, threshold: float = None) -> list:
+def compare_image_to_db(image: Image.Image, threshold: float | None = None) -> list:
     """
     Compare image against all stored assets
     Returns matches above similarity threshold
@@ -107,7 +113,7 @@ def compare_image_to_db(image: Image.Image, threshold: float = None) -> list:
     if threshold is None:
         threshold = float(os.getenv("SIMILARITY_THRESHOLD", 0.85))
 
-    if asset_collection.count() == 0:
+    if asset_collection is None or asset_collection.count() == 0:
         return []
 
     # Layer 1: pHash
@@ -120,7 +126,7 @@ def compare_image_to_db(image: Image.Image, threshold: float = None) -> list:
         query_embeddings=[query_embedding],
         n_results=min(10, asset_collection.count()),
         include=["metadatas", "distances", "documents"]
-    )
+    ) if asset_collection else None
 
     matches = []
     if results and results["ids"][0]:
@@ -140,7 +146,7 @@ def compare_image_to_db(image: Image.Image, threshold: float = None) -> list:
                 matches.append({
                     "asset_id": metadata.get("asset_id"),
                     "clip_similarity": round(similarity, 4),
-                    "phash_distance": int(phash_distance),
+                    "phash_distance": phash_distance,
                     "is_likely_copy": phash_distance < 10 or similarity > 0.92,
                     "metadata": metadata
                 })
@@ -156,7 +162,7 @@ def compare_image_to_db(image: Image.Image, threshold: float = None) -> list:
 
 def get_all_assets() -> list:
     """Get all stored assets"""
-    if asset_collection.count() == 0:
+    if asset_collection is None or asset_collection.count() == 0:
         return []
 
     results = asset_collection.get(include=["metadatas"])

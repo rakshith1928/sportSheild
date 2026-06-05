@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from services.report_generator import generate_report
 from services.rag_engine import explain_violation  #RAG integration
 from services.database import insert_report as db_insert_report, get_reports as db_get_reports
+from typing import Any, cast
 import chromadb
 import uuid
 import os
@@ -38,9 +39,16 @@ async def generate_violation_report(request: ReportRequest):
     # Validate asset exists
     try:
         result = collection.get(ids=[request.asset_id])
-        if not result["ids"]:
+        if not result or not result.get("ids"):
             raise HTTPException(status_code=404, detail="Asset not found")
-        asset = result["metadatas"][0]
+        
+        metadatas = result.get("metadatas")
+        if not metadatas or len(metadatas) == 0:
+            raise HTTPException(status_code=404, detail="Asset metadata missing")
+            
+        asset = metadatas[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Asset error: {str(e)}")
 
@@ -52,7 +60,7 @@ async def generate_violation_report(request: ReportRequest):
 
         # 🔥 RAG + LLM enrichment
         for v in request.violations:
-            v_dict = v.dict()
+            v_dict = v.model_dump()
 
             analysis = explain_violation(v_dict)
 
@@ -68,8 +76,8 @@ async def generate_violation_report(request: ReportRequest):
         report_id = str(uuid.uuid4())[:8].upper()
 
         file_path = generate_report(
-            asset=asset,
-            violations=enriched_violations,  # ✅ FIXED
+            asset=cast(dict, asset),
+            violations=cast(list[dict], enriched_violations),  # ✅ FIXED
             report_id=report_id,
             output_dir=REPORTS_DIR
         )

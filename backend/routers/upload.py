@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import os
 import uuid
 import aiofiles
-from datetime import datetime
+from datetime import datetime, timezone
 from PIL import Image
 import io
 from services.fingerprint import (
@@ -76,7 +76,7 @@ async def upload_asset(
     # Step 5 — Save file to disk (only reaches here if not duplicate)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     asset_id = str(uuid.uuid4())
-    ext = os.path.splitext(file.filename)[1]
+    ext = os.path.splitext(file.filename or "")[1]
     filename = f"{asset_id}{ext}"
     file_path = os.path.join(UPLOAD_DIR, filename)
 
@@ -94,7 +94,7 @@ async def upload_asset(
         "description": description,
         "owner": owner,
         "date": date,
-        "uploaded_at": datetime.utcnow().isoformat(),
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
         "file_size_mb": round(size_mb, 2),
         "content_type": file.content_type
     }

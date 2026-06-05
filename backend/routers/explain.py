@@ -57,7 +57,7 @@ async def explain_violation_endpoint(violation: dict):
 
 
 @router.post("/search-laws")
-async def search_legal_knowledge(query: str, law: str = None):
+async def search_legal_knowledge(query: str, law: str | None = None):
     """
     Search the legal knowledge base directly.
     Optionally filter by law type: dmca, india_copyright, sports_rights

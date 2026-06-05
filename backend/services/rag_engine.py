@@ -5,6 +5,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 from groq import Groq
+from typing import Any
 
 # Global variables
 rag_vectorstore = None
@@ -77,18 +78,19 @@ def _load_documents_into_db():
     chunks = splitter.split_documents(documents)
     print(f"📝 Created {len(chunks)} chunks from {len(documents)} documents")
 
-    rag_vectorstore.add_documents(chunks)
-    rag_vectorstore.persist()
+    if rag_vectorstore:
+        rag_vectorstore.add_documents(chunks)
+        rag_vectorstore.persist()
     print(f"✅ RAG knowledge base built and saved with {len(chunks)} chunks!")
 
 
-def query_rag(query: str, k: int = 3, law_filter: str = None) -> list:
+def query_rag(query: str, k: int = 3, law_filter: str | None = None) -> list:
     """Search knowledge base for relevant legal context with scores"""
     if rag_vectorstore is None:
         return []
 
     #  Optional metadata filtering by law type
-    search_kwargs = {"k": k}
+    search_kwargs: dict[str, Any] = {"k": k}
     if law_filter:
         search_kwargs["filter"] = {"law": law_filter}
 
@@ -147,7 +149,7 @@ def explain_violation(violation: dict) -> dict:
     # 3️⃣ FIX: Use targeted law filter based on severity
     # HIGH violations → check DMCA first (faster takedowns)
     # others → search all laws
-    law_filter = "dmca" if severity == "HIGH" else None
+    law_filter: str | None = "dmca" if severity == "HIGH" else None
     legal_context = query_rag(query, k=3, law_filter=law_filter)
 
     # 3️⃣ FIX: If filtered retrieval returned nothing, fall back to unfiltered

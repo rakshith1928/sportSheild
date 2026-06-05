@@ -28,12 +28,20 @@ async def scan_asset(asset_id: str):
     # Find asset by ID
     try:
         result = collection.get(ids=[asset_id])
-        if not result["ids"]:
+        if not result or not result.get("ids"):
             raise HTTPException(
                 status_code=404,
                 detail=f"Asset {asset_id} not found"
             )
-        metadata = result["metadatas"][0]
+        
+        metadatas = result.get("metadatas")
+        if not metadatas or len(metadatas) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Asset {asset_id} metadata missing"
+            )
+            
+        metadata = metadatas[0]
     except HTTPException:
         raise
     except Exception as e:
@@ -45,15 +53,15 @@ async def scan_asset(asset_id: str):
     # Create scan record in Supabase
     query_used = f"{metadata.get('sport', '')} {metadata.get('team', '')} {metadata.get('description', '')}"
     scan_record = insert_scan(asset_id=asset_id, query_used=query_used.strip())
-    scan_id = scan_record.get("id")
+    scan_id = str(scan_record.get("id", "")) if scan_record else ""
 
     # Run web scan
     print(f"🔍 Starting scan for asset: {asset_id}")
     scan_result = await scan_google_for_asset(
         asset_id=asset_id,
-        description=metadata.get("description", ""),
-        sport=metadata.get("sport", ""),
-        team=metadata.get("team", "")
+        description=str(metadata.get("description", "")),
+        sport=str(metadata.get("sport", "")),
+        team=str(metadata.get("team", ""))
     )
 
     # Rate limit protection between scan calls
@@ -100,7 +108,7 @@ async def scan_asset(asset_id: str):
 
 
 @router.get("/violations")
-async def get_all_violations(severity: str = None):
+async def get_all_violations(severity: str | None = None):
     """Get all detected violations, with optional severity filter"""
     violations = get_violations(severity=severity)
     return {
@@ -127,7 +135,7 @@ async def get_violations_by_asset(asset_id: str):
 
 
 @router.get("/history")
-async def scan_history(asset_id: str = None):
+async def scan_history(asset_id: str | None = None):
     """List all past scans, optionally filtered by asset"""
     scans = get_scan_history(asset_id=asset_id)
     return {

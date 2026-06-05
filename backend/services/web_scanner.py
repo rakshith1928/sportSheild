@@ -5,7 +5,8 @@ from PIL import Image
 import io
 from googleapiclient.discovery import build
 from services.fingerprint import compare_image_to_db
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
@@ -50,7 +51,7 @@ async def scan_google_for_asset(
     description: str,
     sport: str,
     team: str,
-    threshold: float = None
+    threshold: float | None = None
 ) -> dict:
     """
     Search Google for unauthorized copies of an asset.
@@ -74,14 +75,14 @@ async def scan_google_for_asset(
     seen_urls = set()
 
     try:
-        service = build_google_client()
+        service: Any = build_google_client()
 
         result = service.cse().list(
             q=query,
             cx=GOOGLE_CSE_ID,
             searchType="image",
             num=10
-        ).execute()
+        ).execute() if service else {}
 
         # Handle empty results safely
         items = result.get("items", []) or []
@@ -142,7 +143,7 @@ async def scan_google_for_asset(
                     "clip_similarity": best_match["clip_similarity"],
                     "phash_distance": best_match["phash_distance"],
                     "is_likely_copy": best_match["is_likely_copy"],
-                    "detected_at": datetime.utcnow().isoformat(),
+                    "detected_at": datetime.now(timezone.utc).isoformat(),
                     "asset_id": asset_id
                 })
 
@@ -168,5 +169,5 @@ async def scan_google_for_asset(
         "violations_found": len(violations),
         "violations": violations,
         "errors": errors,
-        "scanned_at": datetime.utcnow().isoformat()
+        "scanned_at": datetime.now(timezone.utc).isoformat()
     }
