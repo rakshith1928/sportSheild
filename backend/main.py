@@ -1,3 +1,5 @@
+import logging
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -7,6 +9,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+)
+logger = logging.getLogger("sportshield")
+logger.debug(f"Logging initialized at level={LOG_LEVEL}")
+
 from routers import upload, scan, explain, report, dashboard
 from services.rag_engine import init_rag
 from services.fingerprint import init_clip_model
@@ -15,24 +28,24 @@ from services.database import get_supabase_client
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("Starting SportShield AI...")
+    logger.info("Starting SportShield AI...")
     os.makedirs(os.getenv("UPLOAD_DIR", "uploads"), exist_ok=True)
     os.makedirs("chroma_db", exist_ok=True)
-    print("Loading CLIP model...")
+    logger.info("Loading CLIP model...")
     init_clip_model()
-    print("Initializing RAG knowledge base...")
+    logger.info("Initializing RAG knowledge base...")
     init_rag()
-    print("Connecting to Supabase...")
+    logger.info("Connecting to Supabase...")
     try:
         get_supabase_client()
-        print("Supabase connected!")
+        logger.info("Supabase connected!")
     except Exception as e:
-        print(f"Supabase connection failed: {e}")
-        print("  Backend will work but data won't persist across restarts.")
-    print("SportShield AI ready!")
+        logger.warning(f"Supabase connection failed: {e}")
+        logger.warning("  Backend will work but data won't persist across restarts.")
+    logger.info("SportShield AI ready!")
     yield
     # Shutdown
-    print("Shutting down SportShield AI...")
+    logger.info("Shutting down SportShield AI...")
 
 app = FastAPI(
     title="SportShield AI",

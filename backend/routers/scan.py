@@ -8,9 +8,12 @@ from services.database import (
 )
 import chromadb
 import asyncio
+import logging
 import os
 from fastapi import Depends
 from dependencies import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -56,7 +59,7 @@ async def scan_asset(asset_id: str):
     scan_id = str(scan_record.get("id", "")) if scan_record else ""
 
     # Run web scan
-    print(f"🔍 Starting scan for asset: {asset_id}")
+    logger.info(f"🔍 Starting scan for asset: {asset_id}")
     scan_result = await scan_google_for_asset(
         asset_id=asset_id,
         description=str(metadata.get("description", "")),

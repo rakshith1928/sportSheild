@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 import os
 import uuid
 import aiofiles
+import logging
 from datetime import datetime, timezone
 from PIL import Image
 import io
@@ -12,6 +13,8 @@ from services.fingerprint import (
     compare_image_to_db
 )
 from services.database import insert_asset as db_insert_asset, get_assets as db_get_assets
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -117,7 +120,7 @@ async def upload_asset(
         try:
             db_insert_asset(metadata)
         except Exception as db_err:
-            print(f"Supabase insert failed (non-fatal): {db_err}")
+            logger.warning(f"Supabase insert failed (non-fatal): {db_err}")
 
         # Success
         return JSONResponse(

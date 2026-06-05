@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
@@ -6,6 +7,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 from groq import Groq
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Global variables
 rag_vectorstore = None
@@ -17,18 +20,18 @@ KNOWLEDGE_BASE_PATH = Path("knowledge_base/ip_laws")
 def init_rag():
     global rag_vectorstore, embeddings, groq_client
 
-    print("📚 Loading legal knowledge base...")
+    logger.info("📚 Loading legal knowledge base...")
 
     # Init Groq client
     groq_api_key = os.getenv("GROQ_API_KEY")
     if not groq_api_key:
-        print("⚠️ GROQ_API_KEY not set — explanations will be disabled")
+        logger.warning("⚠️ GROQ_API_KEY not set — explanations will be disabled")
     else:
         groq_client = Groq(api_key=groq_api_key)
-        print("✅ Groq client initialized")
+        logger.info("✅ Groq client initialized")
 
     # Load embeddings model
-    print("Loading embedding model...")
+    logger.info("Loading embedding model...")
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     )
@@ -42,21 +45,21 @@ def init_rag():
 
     existing_ids = rag_vectorstore.get()["ids"]
     if len(existing_ids) == 0:
-        print("📄 Building knowledge base for first time...")
+        logger.info("📄 Building knowledge base for first time...")
         _load_documents_into_db()
     else:
-        print(f"✅ Knowledge base loaded from disk ({len(existing_ids)} chunks)")
+        logger.info(f"✅ Knowledge base loaded from disk ({len(existing_ids)} chunks)")
 
 
 def _load_documents_into_db():
     """Load legal documents into ChromaDB — only called once"""
     if not KNOWLEDGE_BASE_PATH.exists():
-        print(f"⚠️ Knowledge base path not found: {KNOWLEDGE_BASE_PATH}")
+        logger.warning(f"⚠️ Knowledge base path not found: {KNOWLEDGE_BASE_PATH}")
         return
 
     documents = []
     for file_path in KNOWLEDGE_BASE_PATH.glob("*.txt"):
-        print(f"📄 Loading: {file_path.name}")
+        logger.info(f"📄 Loading: {file_path.name}")
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
             documents.append(Document(
@@ -68,7 +71,7 @@ def _load_documents_into_db():
             ))
 
     if not documents:
-        print("⚠️ No documents found in knowledge base")
+        logger.warning("⚠️ No documents found in knowledge base")
         return
 
     splitter = RecursiveCharacterTextSplitter(
@@ -76,12 +79,12 @@ def _load_documents_into_db():
         chunk_overlap=50
     )
     chunks = splitter.split_documents(documents)
-    print(f"📝 Created {len(chunks)} chunks from {len(documents)} documents")
+    logger.info(f"📝 Created {len(chunks)} chunks from {len(documents)} documents")
 
     if rag_vectorstore:
         rag_vectorstore.add_documents(chunks)
         rag_vectorstore.persist()
-    print(f"✅ RAG knowledge base built and saved with {len(chunks)} chunks!")
+    logger.info(f"✅ RAG knowledge base built and saved with {len(chunks)} chunks!")
 
 
 def query_rag(query: str, k: int = 3, law_filter: str | None = None) -> list:
@@ -105,7 +108,7 @@ def query_rag(query: str, k: int = 3, law_filter: str | None = None) -> list:
 
         #  FIX: Filter out low-relevance chunks
         if similarity < 0.4:
-            print(f"⚠️ Skipping low-relevance chunk (score={score:.3f}): {doc.page_content[:60]}...")
+            logger.debug(f"⚠️ Skipping low-relevance chunk (score={score:.3f}): {doc.page_content[:60]}...")
             continue
 
         filtered.append({
@@ -154,7 +157,7 @@ def explain_violation(violation: dict) -> dict:
 
     # 3️⃣ FIX: If filtered retrieval returned nothing, fall back to unfiltered
     if not legal_context:
-        print("⚠️ Filtered search returned nothing — falling back to unfiltered")
+        logger.info("⚠️ Filtered search returned nothing — falling back to unfiltered")
         legal_context = query_rag(query, k=3)
 
     # Limit context size
@@ -229,7 +232,7 @@ Takedown Process:
         explanation = response.choices[0].message.content
 
     except Exception as e:
-        print(f"⚠️ Groq call failed: {e}")
+        logger.warning(f"⚠️ Groq call failed: {e}")
         explanation = _fallback_explanation(severity)
 
     return {

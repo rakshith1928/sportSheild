@@ -1,12 +1,15 @@
 import os
 import httpx
 import asyncio
+import logging
 from PIL import Image
 import io
 from googleapiclient.discovery import build
 from services.fingerprint import compare_image_to_db
 from datetime import datetime, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
@@ -25,16 +28,16 @@ async def download_image(url: str) -> Image.Image | None:
             response = await client.get(url)
 
             if response.status_code != 200:
-                print(f" Bad status {response.status_code} for {url}")
+                logger.warning(f" Bad status {response.status_code} for {url}")
                 return None
 
             content_type = response.headers.get("content-type", "")
             if "image" not in content_type:
-                print(f" Not an image ({content_type}): {url}")
+                logger.warning(f" Not an image ({content_type}): {url}")
                 return None
 
             if len(response.content) > 5 * 1024 * 1024:
-                print(f" Image too large (>5MB): {url}")
+                logger.warning(f" Image too large (>5MB): {url}")
                 return None
 
             image = Image.open(
@@ -43,7 +46,7 @@ async def download_image(url: str) -> Image.Image | None:
             return image
 
     except Exception as e:
-        print(f"Failed to download {url}: {e}")
+        logger.error(f"Failed to download {url}: {e}")
         return None
 
 async def scan_google_for_asset(
@@ -67,7 +70,7 @@ async def scan_google_for_asset(
 
     #Improved search query
     query = f"{team} {sport} {description} logo OR poster OR official"
-    print(f"🔍 Scanning web for: {query}")
+    logger.info(f"🔍 Scanning web for: {query}")
 
     violations = []
     scanned_urls = []
@@ -86,7 +89,7 @@ async def scan_google_for_asset(
 
         # Handle empty results safely
         items = result.get("items", []) or []
-        print(f"Found {len(items)} images to scan")
+        logger.info(f"Found {len(items)} images to scan")
 
         #Build parallel download tasks
         tasks = []
@@ -107,7 +110,7 @@ async def scan_google_for_asset(
             url_map.append((image_url, page_url, item))
 
         # Download all images in parallel
-        print(f" Downloading {len(tasks)} images in parallel...")
+        logger.info(f" Downloading {len(tasks)} images in parallel...")
         images = await asyncio.gather(*tasks)
 
         # Process results
@@ -160,7 +163,7 @@ async def scan_google_for_asset(
         reverse=True
     )
 
-    print(f"🚨 Found {len(violations)} violations")
+    logger.info(f"🚨 Found {len(violations)} violations")
 
     return {
         "asset_id": asset_id,

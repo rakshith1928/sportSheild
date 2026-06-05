@@ -6,8 +6,11 @@ from services.rag_engine import explain_violation  #RAG integration
 from services.database import insert_report as db_insert_report, get_reports as db_get_reports
 from typing import Any, cast
 import chromadb
+import logging
 import uuid
 import os
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 REPORTS_DIR = "reports"
@@ -92,7 +95,7 @@ async def generate_violation_report(request: ReportRequest):
                 "download_url": f"/report/download/{report_id}",
             })
         except Exception as db_err:
-            print(f"Supabase report insert failed (non-fatal): {db_err}")
+            logger.warning(f"Supabase report insert failed (non-fatal): {db_err}")
 
         return {
             "success": True,

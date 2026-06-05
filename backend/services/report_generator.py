@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timezone
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -9,6 +10,8 @@ from reportlab.platypus import (
     TableStyle, HRFlowable, PageBreak
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+
+logger = logging.getLogger(__name__)
 
 # Color palette
 PRIMARY = colors.HexColor("#1a1a2e")
@@ -352,5 +355,5 @@ def generate_report(
     ))
 
     doc.build(story)
-    print(f"Report generated: {file_path}")
+    logger.info(f"Report generated: {file_path}")
     return file_path

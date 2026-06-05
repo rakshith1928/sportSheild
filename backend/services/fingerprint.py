@@ -2,6 +2,7 @@ import imagehash
 from PIL import Image
 import numpy as np
 import chromadb
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
@@ -9,6 +10,8 @@ from transformers import CLIPProcessor, CLIPModel
 import torch
 import cv2
 from typing import Optional, Any, cast
+
+logger = logging.getLogger(__name__)
 
 # Global variables
 _clip_model: Optional[Any] = None
@@ -19,13 +22,13 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def init_clip_model():
     global _clip_model, _clip_processor, chroma_client, asset_collection
- 
-    print(f"🖥️ Using device: {device}")
-    print("Loading CLIP model...")
+
+    logger.info(f"🖥️ Using device: {device}")
+    logger.info("Loading CLIP model...")
     # Use cast to satisfy linter if it's confused about Transformers types
     _clip_model = cast(Any, CLIPModel).from_pretrained("openai/clip-vit-base-patch32")
     _clip_processor = cast(Any, CLIPProcessor).from_pretrained("openai/clip-vit-base-patch32")
- 
+
     # 3️⃣ GPU optimization
     if _clip_model:
         _clip_model.to(device)
@@ -39,7 +42,7 @@ def init_clip_model():
         name="sports_assets",
         metadata={"hnsw:space": "cosine"}
     )
-    print(f"✅ CLIP ready on {device}. Assets in DB: {asset_collection.count()}")
+    logger.info(f"✅ CLIP ready on {device}. Assets in DB: {asset_collection.count()}")
 
 def get_clip_embedding(image: Image.Image) -> list:
     """Get CLIP embedding for image"""
