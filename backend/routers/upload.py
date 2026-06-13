@@ -127,7 +127,6 @@ async def upload_asset(
 
         # Handle bad image
         if "error" in result:
-            os.remove(file_path)
             raise HTTPException(
                 status_code=400,
                 detail=f"Image error: {result['error']}"
@@ -140,10 +139,6 @@ async def upload_asset(
             db_insert_asset(metadata)
         except Exception as db_err:
             logger.warning(f"Supabase DB insert failed (non-fatal): {db_err}")
-
-        # Cleanup local file (since it's in Supabase now)
-        if os.path.exists(file_path):
-            os.remove(file_path)
 
         # Success
         return JSONResponse(
@@ -160,14 +155,18 @@ async def upload_asset(
 
     except HTTPException:
         raise
-
     except Exception as e:
-        if os.path.exists(file_path):
-            os.remove(file_path)
         raise HTTPException(
             status_code=500,
             detail=f"Fingerprinting failed: {str(e)}"
         )
+    finally:
+        # Cleanup local temporary file regardless of HTTP success or failure
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as cleanup_err:
+                logger.error(f"Failed to cleanup temp file {file_path}: {cleanup_err}")
 
 @router.get("/assets")
 async def list_assets(user = Depends(get_current_user)):
