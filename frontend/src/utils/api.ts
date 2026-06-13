@@ -17,7 +17,9 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
 
   // 2. Prepare headers
   const headers = new Headers(options.headers)
-  headers.set('Content-Type', 'application/json')
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
   
   // 3. Attach the Bearer token if the user is logged in
   if (session?.access_token) {
@@ -62,5 +64,26 @@ export async function getRecentAlerts() {
   } catch (error) {
     console.error("Failed to fetch alerts, returning fallback data", error)
     return []
+  }
+}
+
+export async function getAssets() {
+  try {
+    return await fetchApi('/upload/assets')
+  } catch (error) {
+    console.error("Failed to fetch assets", error)
+    return { total: 0, assets: [] }
+  }
+}
+
+export async function uploadAsset(formData: FormData) {
+  try {
+    return await fetchApi('/upload/asset', {
+      method: 'POST',
+      body: formData,
+    })
+  } catch (error) {
+    console.error("Failed to upload asset", error)
+    throw error
   }
 }
