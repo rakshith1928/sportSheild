@@ -12,7 +12,9 @@ from services.fingerprint import (
     get_all_assets,
     compare_image_to_db
 )
-from services.database import insert_asset as db_insert_asset, get_assets as db_get_assets
+from services.database import insert_asset as db_insert_asset, get_assets as db_get_assets, get_supabase_client
+from dependencies import get_current_user
+from fastapi import Depends
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +32,8 @@ async def upload_asset(
     team: str = Form(...),
     event: str = Form(""),
     description: str = Form(""),
-    owner: str = Form(""),
-    date: str = Form("")
+    date: str = Form(""),
+    user = Depends(get_current_user)
 ):
     """Upload and fingerprint a sports media asset"""
 
@@ -76,7 +78,7 @@ async def upload_asset(
                 detail=f"Invalid image file: {str(e)}"
             )
 
-    # Step 5 — Save file to disk (only reaches here if not duplicate)
+    # Step 5 — Save file to disk temporarily for fingerprinting
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     asset_id = str(uuid.uuid4())
     ext = os.path.splitext(file.filename or "")[1]
@@ -85,6 +87,23 @@ async def upload_asset(
 
     async with aiofiles.open(file_path, "wb") as f:
         await f.write(content)
+
+    # Step 5.5 — Upload to Supabase Storage
+    supabase = get_supabase_client()
+    try:
+        supabase.storage.from_("assets").upload(
+            path=filename,
+            file=content,
+            file_options={"content-type": file.content_type}  # type: ignore
+        )
+        file_url = supabase.storage.from_("assets").get_public_url(filename)
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Supabase Storage upload failed: {str(e)}"
+        )
 
     # Step 6 — Build metadata
     metadata = {
@@ -95,7 +114,7 @@ async def upload_asset(
         "team": team,
         "event": event,
         "description": description,
-        "owner": owner,
+        "owner": user.id,
         "date": date,
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
         "file_size_mb": round(size_mb, 2),
@@ -114,13 +133,17 @@ async def upload_asset(
                 detail=f"Image error: {result['error']}"
             )
 
-        # Step 8 — Dual-write to Supabase
-        metadata["file_url"] = f"/uploads/{filename}"
+        # Step 8 — Dual-write to Supabase DB
+        metadata["file_url"] = file_url
         metadata["phash"] = result.get("phash")
         try:
             db_insert_asset(metadata)
         except Exception as db_err:
-            logger.warning(f"Supabase insert failed (non-fatal): {db_err}")
+            logger.warning(f"Supabase DB insert failed (non-fatal): {db_err}")
+
+        # Cleanup local file (since it's in Supabase now)
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
         # Success
         return JSONResponse(
@@ -129,9 +152,9 @@ async def upload_asset(
                 "success": True,
                 "asset_id": asset_id,
                 "filename": filename,
-                "file_url": f"/uploads/{filename}",
+                "file_url": file_url,
                 "fingerprint": result,
-                "message": "Asset fingerprinted and protected!"
+                "message": "Asset fingerprinted, stored in cloud, and protected!"
             }
         )
 
@@ -147,12 +170,21 @@ async def upload_asset(
         )
 
 @router.get("/assets")
-async def list_assets():
-    """List all protected assets"""
+async def list_assets(user = Depends(get_current_user)):
+    """List all protected assets for the logged-in user"""
     try:
-        assets = db_get_assets()
+        supabase = get_supabase_client()
+        result = (
+            supabase.table("assets")
+            .select("*")
+            .eq("owner", user.id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        assets = result.data or []
         return {"total": len(assets), "assets": assets}
-    except Exception:
-        # Fallback to ChromaDB if Supabase is down
-        assets = get_all_assets()
-        return {"total": len(assets), "assets": assets}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list assets: {str(e)}"
+        )
