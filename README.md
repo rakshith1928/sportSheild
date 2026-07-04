@@ -170,10 +170,10 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 - [x] Phase 1 — Design System & Component Migration (globals.css, StatCard, AlertRow, SeverityBadge)
 - [x] Phase 2 — Auth & Landing Page Gateway (Supabase Auth, /login, /auth/callback, middleware protection)
-- [ ] Phase 3 — Static Dashboard Layout (App.tsx → dashboard/page.tsx)
-- [ ] Phase 4 — Real-time API Client (api.ts + Supabase Realtime)
-- [ ] Phase 5 — Upload Flow & Cloud Storage (Supabase Storage)
-- [ ] Phase 6 — Violations RAG & Reports (DetailsDrawer + PDF)
+- [x] Phase 3 — Static Dashboard Layout (App.tsx → dashboard/page.tsx)
+- [x] Phase 4 — Real-time API Client (api.ts + Supabase Realtime)
+- [x] Phase 5 — Upload Flow & Cloud Storage (Supabase Storage)
+- [x] Phase 6 — Violations RAG & Reports (DetailsDrawer + PDF)
 - [ ] Phase 7 — Enterprise Backend Scalability (Queues, RBAC, Pagination)
 
 ---
