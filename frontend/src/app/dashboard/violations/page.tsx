@@ -1,17 +1,56 @@
-export default function ViolationsPage() {
+import { getViolations, ViolationDetails } from '@/utils/api'
+import { ViolationsClient } from '@/components/violations/ViolationsClient'
+
+export const dynamic = 'force-dynamic'
+
+type ViolationsSearchParams = {
+  severity?: 'high' | 'medium' | 'low' | string
+}
+
+export default async function ViolationsPage({
+  searchParams,
+}: {
+  searchParams: ViolationsSearchParams
+}) {
+  const severity =
+    ['high', 'medium', 'low'].includes(searchParams.severity ?? '')
+      ? searchParams.severity
+      : undefined
+
+  let violationsData: { violations: ViolationDetails[], total: number } = { violations: [], total: 0 }
+  let hasError = false
+
+  try {
+    const res = await getViolations(severity)
+    if (res) violationsData = res
+  } catch (err) {
+    console.error("Dashboard failed to load violations feed:", err)
+    hasError = true
+  }
+
+  const { violations = [], total = 0 } = violationsData
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Violations</h1>
-        <p className="text-slate-400 text-sm mt-1">All detected copyright violations across your assets</p>
+    <div className="min-h-[calc(100vh-4rem)] flex flex-col">
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-500 tracking-tight">
+          THREAT INTELLIGENCE
+        </h1>
+        <p className="text-[#FF6B6B] font-mono text-xs tracking-[0.2em] mt-1 uppercase">
+          Live Forensic Operations Center // {total} Events Detected
+        </p>
       </div>
-      <div className="flex items-center justify-center h-64 rounded-xl border border-dashed border-slate-700 bg-[#111415]">
-        <div className="text-center space-y-3">
-          <span className="material-symbols-outlined text-slate-600 text-5xl block" style={{ fontVariationSettings: "'FILL' 1" }}>travel_explore</span>
-          <p className="text-slate-400 font-medium">Violations Drilldown & RAG Legal Context</p>
-          <p className="text-slate-600 text-sm">Coming in Phase 6</p>
+
+      {hasError && (
+        <div className="bg-red-500/10 border border-red-500/30 p-4 rounded text-red-400 font-mono text-sm shadow-[0_0_15px_rgba(239,68,68,0.1)] mb-6">
+          <span className="font-bold">SYSTEM ERROR:</span> Failed to query the vector database for violation intelligence.
         </div>
-      </div>
+      )}
+
+      <ViolationsClient 
+        initialViolations={violations} 
+        currentSeverity={severity} 
+      />
     </div>
   )
 }
