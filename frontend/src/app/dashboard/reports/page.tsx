@@ -3,17 +3,29 @@ import { ReportsClient } from '@/components/reports/ReportsClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ReportsPage() {
-  let reportsData: ReportsResponse = { total: 0, reports: [] }
-  let assetsData: { total: number; assets: any[] } = { total: 0, assets: [] }
+// Strongly typed asset model
+interface Asset {
+  asset_id: string
+  filename: string
+  original_filename?: string
+  file_url: string
+  content_type?: string
+  sport?: string
+  team?: string
+  description?: string
+}
 
-  try {
-    const [reports, assets] = await Promise.all([getReports(), getAssets()])
-    if (reports) reportsData = reports
-    if (assets) assetsData = assets
-  } catch (err) {
-    console.error('Failed to load reports data:', err)
-  }
+interface AssetsResponse {
+  total: number
+  assets: Asset[]
+}
+
+export default async function ReportsPage() {
+  // Simplified: errors handled per-request via .catch(), no try/catch block needed
+  const [reportsData, assetsData] = await Promise.all([
+    getReports().catch((): ReportsResponse => ({ total: 0, reports: [] })),
+    getAssets().catch((): AssetsResponse => ({ total: 0, assets: [] })),
+  ])
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col">
