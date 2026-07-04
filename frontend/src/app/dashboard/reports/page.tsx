@@ -1,17 +1,35 @@
-export default function ReportsPage() {
+import { getReports, getAssets, ReportsResponse } from '@/utils/api'
+import { ReportsClient } from '@/components/reports/ReportsClient'
+
+export const dynamic = 'force-dynamic'
+
+export default async function ReportsPage() {
+  let reportsData: ReportsResponse = { total: 0, reports: [] }
+  let assetsData: { total: number; assets: any[] } = { total: 0, assets: [] }
+
+  try {
+    const [reports, assets] = await Promise.all([getReports(), getAssets()])
+    if (reports) reportsData = reports
+    if (assets) assetsData = assets
+  } catch (err) {
+    console.error('Failed to load reports data:', err)
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Reports</h1>
-        <p className="text-slate-400 text-sm mt-1">Generate and download PDF takedown notices</p>
+    <div className="min-h-[calc(100vh-4rem)] flex flex-col">
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-500 tracking-tight">
+          CASE REPORT CENTER
+        </h1>
+        <p className="text-[#FF6B6B] font-mono text-xs tracking-[0.2em] mt-1 uppercase">
+          Forensic PDF Compilation Engine // {reportsData.total} Reports Generated
+        </p>
       </div>
-      <div className="flex items-center justify-center h-64 rounded-xl border border-dashed border-slate-700 bg-[#111415]">
-        <div className="text-center space-y-3">
-          <span className="material-symbols-outlined text-slate-600 text-5xl block" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
-          <p className="text-slate-400 font-medium">PDF Report Generation</p>
-          <p className="text-slate-600 text-sm">Coming in Phase 6</p>
-        </div>
-      </div>
+
+      <ReportsClient
+        initialReports={reportsData.reports}
+        assets={assetsData.assets}
+      />
     </div>
   )
 }
