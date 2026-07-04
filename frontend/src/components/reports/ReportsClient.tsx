@@ -2,40 +2,15 @@
 
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
-import { ReportMeta, ViolationDetails, generateReport, getAssetViolations } from '@/utils/api'
+import { ReportMeta, ViolationDetails, generateReport, getAssetViolations, getReports } from '@/utils/api'
+import { Asset } from './types'
+import { SeverityPill, CompileStep } from './ReportHelpers'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface Props {
   initialReports: ReportMeta[]
-  assets: any[]
-}
-
-// Severity badge helper
-function SeverityPill({ count }: { count: number }) {
-  const color = count > 5 ? 'text-red-400 border-red-500/30 bg-red-500/10'
-    : count > 2 ? 'text-orange-400 border-orange-500/30 bg-orange-500/10'
-    : 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm border font-mono text-[10px] tracking-widest ${color}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-      {count} VIOLATIONS
-    </span>
-  )
-}
-
-// Animated compilation step indicator
-function CompileStep({ step, label, active }: { step: number; label: string; active: boolean }) {
-  return (
-    <div className={`flex items-center gap-3 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-30'}`}>
-      <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-mono
-        ${active ? 'border-[#FF6B6B] text-[#FF6B6B] bg-[#FF6B6B]/10 animate-pulse' : 'border-slate-700 text-slate-500'}`}>
-        {step}
-      </div>
-      <span className={`font-mono text-xs tracking-wider ${active ? 'text-white' : 'text-slate-500'}`}>{label}</span>
-    </div>
-  )
+  assets: Asset[]
 }
 
 export function ReportsClient({ initialReports, assets }: Props) {
@@ -56,7 +31,7 @@ export function ReportsClient({ initialReports, assets }: Props) {
 
     startTransition(async () => {
       try {
-        // Step 1: Fetching violations
+        // Step 1: Fetch violations for this asset
         setCompileStep(1)
         const violationsRes = await getAssetViolations(selectedAssetId)
         const violations: ViolationDetails[] = violationsRes.violations
@@ -67,22 +42,15 @@ export function ReportsClient({ initialReports, assets }: Props) {
           return
         }
 
-        // Step 2: RAG enrichment + compile
+        // Step 2: RAG enrichment + PDF compile (synchronous on backend)
         setCompileStep(2)
-        const result = await generateReport(selectedAssetId, violations)
+        await generateReport(selectedAssetId, violations)
 
-        // Step 3: Storing record
+        // Step 3: Refetch from server — ensures timestamps/metadata are accurate
         setCompileStep(3)
+        const refreshed = await getReports().catch(() => null)
+        if (refreshed) setReports(refreshed.reports)
 
-        // Append to the local list immediately
-        const newReport: ReportMeta = {
-          report_id: result.report_id,
-          asset_id: selectedAssetId,
-          download_url: result.download_url,
-          violations_analyzed: result.violations_analyzed,
-          created_at: new Date().toISOString(),
-        }
-        setReports((prev) => [newReport, ...prev])
         setCompileStep(0)
         setSelectedAssetId('')
       } catch (err: unknown) {
@@ -140,7 +108,6 @@ export function ReportsClient({ initialReports, assets }: Props) {
                           : 'border-slate-800/60 hover:border-slate-600 bg-[#111415]'}
                       `}
                     >
-                      {/* Thumbnail */}
                       <div className="relative w-10 h-10 rounded-md overflow-hidden flex-shrink-0 bg-black border border-slate-800">
                         {asset.content_type?.startsWith('image/') ? (
                           <Image src={asset.file_url} alt={asset.filename} fill unoptimized className="object-cover" />
@@ -176,7 +143,6 @@ export function ReportsClient({ initialReports, assets }: Props) {
 
           {/* Right: Compile Actions + Steps */}
           <div className="flex flex-col justify-between">
-            {/* Selected asset preview */}
             <div className="mb-6">
               <p className="text-[10px] font-mono text-slate-500 tracking-[0.2em] uppercase mb-3">
                 Compilation Target
@@ -209,16 +175,14 @@ export function ReportsClient({ initialReports, assets }: Props) {
               )}
             </div>
 
-            {/* Compile Steps */}
             {isPending && (
               <div className="space-y-3 mb-6 p-4 bg-[#080A0B] border border-slate-800 rounded-lg">
                 <CompileStep step={1} label="FETCHING VIOLATION EVENTS..." active={compileStep === 1} />
                 <CompileStep step={2} label="RAG ENRICHMENT + LLM ANALYSIS..." active={compileStep === 2} />
-                <CompileStep step={3} label="COMPILING PDF DOCUMENT..." active={compileStep === 3} />
+                <CompileStep step={3} label="SYNCING REPORT FROM SERVER..." active={compileStep === 3} />
               </div>
             )}
 
-            {/* Compile Button */}
             <button
               onClick={handleCompile}
               disabled={isPending || !selectedAssetId}
@@ -230,7 +194,6 @@ export function ReportsClient({ initialReports, assets }: Props) {
                   : 'border-[#FF6B6B]/40 text-white bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 hover:border-[#FF6B6B]/70 hover:shadow-[0_0_30px_rgba(255,107,107,0.2)] cursor-pointer'}
               `}
             >
-              {/* Animated shimmer on hover */}
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
               <span className="relative flex items-center justify-center gap-3">
                 {isPending ? (
@@ -275,34 +238,30 @@ export function ReportsClient({ initialReports, assets }: Props) {
           </div>
         ) : (
           <div className="divide-y divide-white/5">
-            {/* Table Header */}
             <div className="grid grid-cols-[1fr_2fr_1fr_1fr_auto] gap-4 px-6 py-3">
               {['Report ID', 'Asset', 'Violations', 'Compiled At', 'Download'].map((col) => (
                 <span key={col} className="font-mono text-[9px] tracking-[0.25em] text-slate-600 uppercase">{col}</span>
               ))}
             </div>
 
-            {/* Table Rows */}
             {reports.map((report, idx) => {
-              const assetName = assets.find((a) => a.asset_id === report.asset_id)
-              const displayName = assetName?.original_filename || assetName?.filename || 'Unknown Asset'
-              
+              const assetMeta = assets.find((a) => a.asset_id === report.asset_id)
+              const displayName = assetMeta?.original_filename || assetMeta?.filename || 'Unknown Asset'
+
               return (
                 <div
                   key={report.report_id}
-                  className="grid grid-cols-[1fr_2fr_1fr_1fr_auto] gap-4 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors group"
+                  className="grid grid-cols-[1fr_2fr_1fr_1fr_auto] gap-4 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors"
                   style={{ animationDelay: `${idx * 40}ms` }}
                 >
-                  {/* Report ID */}
                   <div className="font-mono">
                     <span className="text-xs text-[#00FF9D] tracking-wider font-bold">#{report.report_id}</span>
                   </div>
 
-                  {/* Asset */}
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="relative w-7 h-7 flex-shrink-0 rounded overflow-hidden border border-slate-800 bg-black">
-                      {assetName?.content_type?.startsWith('image/') ? (
-                        <Image src={assetName.file_url} alt={displayName} fill unoptimized className="object-cover opacity-70" />
+                      {assetMeta?.content_type?.startsWith('image/') ? (
+                        <Image src={assetMeta.file_url} alt={displayName} fill unoptimized className="object-cover opacity-70" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <span className="material-symbols-outlined text-slate-700 text-[12px]">movie</span>
@@ -312,21 +271,18 @@ export function ReportsClient({ initialReports, assets }: Props) {
                     <span className="font-mono text-xs text-slate-300 truncate">{displayName}</span>
                   </div>
 
-                  {/* Violations count */}
                   <div>
                     <SeverityPill count={report.violations_analyzed} />
                   </div>
 
-                  {/* Date */}
                   <div className="font-mono text-[10px] text-slate-500">
                     {new Date(report.created_at).toLocaleString('en-US', {
                       month: 'short', day: '2-digit',
                       hour: '2-digit', minute: '2-digit',
-                      hour12: false
+                      hour12: false,
                     })}
                   </div>
 
-                  {/* Download */}
                   <a
                     href={`${API_BASE_URL}${report.download_url}`}
                     target="_blank"

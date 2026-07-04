@@ -1,19 +1,8 @@
 import { getReports, getAssets, ReportsResponse } from '@/utils/api'
 import { ReportsClient } from '@/components/reports/ReportsClient'
+import { Asset } from '@/components/reports/types'
 
 export const dynamic = 'force-dynamic'
-
-// Strongly typed asset model
-interface Asset {
-  asset_id: string
-  filename: string
-  original_filename?: string
-  file_url: string
-  content_type?: string
-  sport?: string
-  team?: string
-  description?: string
-}
 
 interface AssetsResponse {
   total: number
@@ -21,7 +10,6 @@ interface AssetsResponse {
 }
 
 export default async function ReportsPage() {
-  // Simplified: errors handled per-request via .catch(), no try/catch block needed
   const [reportsData, assetsData] = await Promise.all([
     getReports().catch((): ReportsResponse => ({ total: 0, reports: [] })),
     getAssets().catch((): AssetsResponse => ({ total: 0, assets: [] })),
