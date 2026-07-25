@@ -2,11 +2,13 @@ import os
 import logging
 from pathlib import Path
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import SupabaseVectorStore
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 from groq import Groq
 from typing import Any
+from supabase import create_client
+from services.vector_store import count_rag_documents
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,7 @@ embeddings = None
 groq_client = None
 
 KNOWLEDGE_BASE_PATH = Path("knowledge_base/ip_laws")
+
 
 def init_rag():
     global rag_vectorstore, embeddings, groq_client
@@ -30,29 +33,35 @@ def init_rag():
         groq_client = Groq(api_key=groq_api_key)
         logger.info("✅ Groq client initialized")
 
-    # Load embeddings model
+    # Load embeddings model (MiniLM, 384-dim)
     logger.info("Loading embedding model...")
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     )
 
-    # FIX: Load existing DB instead of rebuilding every run
-    rag_vectorstore = Chroma(
-        persist_directory="./chroma_db",
-        embedding_function=embeddings,
-        collection_name="legal_knowledge"
+    # Connect to Supabase pgvector for RAG knowledge base
+    supabase_client = create_client(
+        os.environ["SUPABASE_URL"],
+        os.environ["SUPABASE_SERVICE_KEY"],
+    )
+    rag_vectorstore = SupabaseVectorStore(
+        client=supabase_client,
+        embedding=embeddings,
+        table_name="rag_documents",
+        query_name="match_rag_documents",
     )
 
-    existing_ids = rag_vectorstore.get()["ids"]
-    if len(existing_ids) == 0:
+    # Only ingest documents if the table is empty (persists across restarts)
+    existing_count = count_rag_documents()
+    if existing_count == 0:
         logger.info("📄 Building knowledge base for first time...")
         _load_documents_into_db()
     else:
-        logger.info(f"✅ Knowledge base loaded from disk ({len(existing_ids)} chunks)")
+        logger.info(f"✅ Knowledge base loaded from Supabase ({existing_count} chunks)")
 
 
 def _load_documents_into_db():
-    """Load legal documents into ChromaDB — only called once"""
+    """Load legal documents into Supabase RAG table — only called once on first boot."""
     if not KNOWLEDGE_BASE_PATH.exists():
         logger.warning(f"⚠️ Knowledge base path not found: {KNOWLEDGE_BASE_PATH}")
         return
@@ -64,27 +73,20 @@ def _load_documents_into_db():
             content = f.read()
             documents.append(Document(
                 page_content=content,
-                metadata={
-                    "source": file_path.name,
-                    "law": file_path.stem
-                }
+                metadata={"source": file_path.name, "law": file_path.stem}
             ))
 
     if not documents:
         logger.warning("⚠️ No documents found in knowledge base")
         return
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50
-    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_documents(documents)
     logger.info(f"📝 Created {len(chunks)} chunks from {len(documents)} documents")
 
     if rag_vectorstore:
         rag_vectorstore.add_documents(chunks)
-        rag_vectorstore.persist()
-    logger.info(f"✅ RAG knowledge base built and saved with {len(chunks)} chunks!")
+    logger.info(f"✅ RAG knowledge base built and saved to Supabase with {len(chunks)} chunks!")
 
 
 def query_rag(query: str, k: int = 3, law_filter: str | None = None) -> list:
@@ -92,30 +94,22 @@ def query_rag(query: str, k: int = 3, law_filter: str | None = None) -> list:
     if rag_vectorstore is None:
         return []
 
-    #  Optional metadata filtering by law type
     search_kwargs: dict[str, Any] = {"k": k}
     if law_filter:
         search_kwargs["filter"] = {"law": law_filter}
 
-    # Use similarity_search_with_score to get relevance scores
-    results = rag_vectorstore.similarity_search_with_score(query, **search_kwargs)
+    results = rag_vectorstore.similarity_search_with_relevance_scores(query, **search_kwargs)
 
     filtered = []
     for doc, score in results:
-        # Chroma returns L2 distance — lower = more similar
-        # Convert to 0-1 similarity: 1 = perfect match
-        similarity = 1 / (1 + score)
-
-        #  FIX: Filter out low-relevance chunks
-        if similarity < 0.4:
+        if score < 0.4:
             logger.debug(f"⚠️ Skipping low-relevance chunk (score={score:.3f}): {doc.page_content[:60]}...")
             continue
-
         filtered.append({
             "content": doc.page_content,
             "source": doc.metadata.get("source", "unknown"),
             "law": doc.metadata.get("law", "unknown"),
-            "relevance_score": round(similarity, 3)
+            "relevance_score": round(score, 3),
         })
 
     return filtered
@@ -126,11 +120,8 @@ def explain_violation(violation: dict) -> dict:
 
     similarity = violation.get("clip_similarity", 0)
     is_copy = violation.get("is_likely_copy", False)
-
-    # 4️⃣ FIX: Confidence score
     confidence = round(similarity * 100, 2)
 
-    # Severity logic
     if similarity > 0.92 and is_copy:
         severity = "HIGH"
     elif similarity > 0.85:
@@ -138,7 +129,6 @@ def explain_violation(violation: dict) -> dict:
     else:
         severity = "LOW"
 
-    # Rich query for better retrieval
     query = f"""
     sports copyright infringement
     unauthorized broadcasting
@@ -149,18 +139,13 @@ def explain_violation(violation: dict) -> dict:
     source url {violation.get('page_url', '')}
     """
 
-    # 3️⃣ FIX: Use targeted law filter based on severity
-    # HIGH violations → check DMCA first (faster takedowns)
-    # others → search all laws
     law_filter: str | None = "dmca" if severity == "HIGH" else None
     legal_context = query_rag(query, k=3, law_filter=law_filter)
 
-    # 3️⃣ FIX: If filtered retrieval returned nothing, fall back to unfiltered
     if not legal_context:
         logger.info("⚠️ Filtered search returned nothing — falling back to unfiltered")
         legal_context = query_rag(query, k=3)
 
-    # Limit context size
     legal_context = legal_context[:2]
 
     if not legal_context:
@@ -171,17 +156,15 @@ def explain_violation(violation: dict) -> dict:
             for ctx in legal_context
         ])
 
-    # Fallback if Groq not configured
     if groq_client is None:
         return {
             "explanation": _fallback_explanation(severity),
             "severity": severity,
             "confidence": confidence,
             "legal_context": legal_context,
-            "recommended_action": get_recommended_action(severity)
+            "recommended_action": get_recommended_action(severity),
         }
 
-    # Grounded prompt with structured output
     prompt = f"""You are a legal advisor specializing in digital media copyright and sports broadcasting rights.
 
 A potential copyright violation has been detected:
@@ -219,18 +202,14 @@ Takedown Process:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a legal advisor for digital sports media copyright protection. Only use facts from the provided context."
+                    "content": "You are a legal advisor for digital sports media copyright protection. Only use facts from the provided context.",
                 },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+                {"role": "user", "content": prompt},
             ],
             max_tokens=400,
-            temperature=0.3
+            temperature=0.3,
         )
         explanation = response.choices[0].message.content
-
     except Exception as e:
         logger.warning(f"⚠️ Groq call failed: {e}")
         explanation = _fallback_explanation(severity)
@@ -240,11 +219,11 @@ Takedown Process:
         "severity": severity,
         "confidence": confidence,
         "legal_context": legal_context,
-        "recommended_action": get_recommended_action(severity)
+        "recommended_action": get_recommended_action(severity),
     }
 
+
 def _fallback_explanation(severity: str) -> str:
-    """Structured fallback explanation when LLM is unavailable"""
     return f"""Law Violated:
 Potential violation of DMCA Section 512 and/or Indian Copyright Act Section 51 — unauthorized reproduction or distribution of protected sports media.
 
@@ -265,6 +244,6 @@ def get_recommended_action(severity: str) -> str:
     actions = {
         "LOW": "Monitor the URL and send an informal cease and desist email to the site owner.",
         "MEDIUM": "File a platform takedown notice (YouTube/Instagram/Twitter) and send a formal cease and desist letter.",
-        "HIGH": "File a DMCA takedown immediately, notify your legal team, and consider pursuing civil damages."
+        "HIGH": "File a DMCA takedown immediately, notify your legal team, and consider pursuing civil damages.",
     }
     return actions.get(severity, "Monitor and assess further.")

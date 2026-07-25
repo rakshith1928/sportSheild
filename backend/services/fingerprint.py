@@ -1,7 +1,6 @@
 import imagehash
 from PIL import Image
 import numpy as np
-import chromadb
 import logging
 import os
 import uuid
@@ -10,50 +9,38 @@ from transformers import CLIPProcessor, CLIPModel
 import torch
 import cv2
 from typing import Optional, Any, cast
+from services import vector_store
 
 logger = logging.getLogger(__name__)
 
 # Global variables
 _clip_model: Optional[Any] = None
 _clip_processor: Optional[Any] = None
-chroma_client = None
-asset_collection = None
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+
 def init_clip_model():
-    global _clip_model, _clip_processor, chroma_client, asset_collection
+    global _clip_model, _clip_processor
 
     logger.info(f"🖥️ Using device: {device}")
     logger.info("Loading CLIP model...")
-    # Use cast to satisfy linter if it's confused about Transformers types
     _clip_model = cast(Any, CLIPModel).from_pretrained("openai/clip-vit-base-patch32")
     _clip_processor = cast(Any, CLIPProcessor).from_pretrained("openai/clip-vit-base-patch32")
 
-    # 3️⃣ GPU optimization
     if _clip_model:
         _clip_model.to(device)
         _clip_model.eval()
 
-    # Init ChromaDB
-    chroma_client = chromadb.PersistentClient(
-        path=os.getenv("CHROMA_DB_PATH", "./chroma_db")
-    )
-    asset_collection = chroma_client.get_or_create_collection(
-        name="sports_assets",
-        metadata={"hnsw:space": "cosine"}
-    )
-    logger.info(f"✅ CLIP ready on {device}. Assets in DB: {asset_collection.count()}")
+    asset_count = vector_store.count_assets()
+    logger.info(f"✅ CLIP ready on {device}. Assets in pgvector DB: {asset_count}")
+
 
 def get_clip_embedding(image: Image.Image) -> list:
     """Get CLIP embedding for image"""
     if _clip_processor is None or _clip_model is None:
         return []
-        
-    # 3️⃣ GPU optimization
-    inputs = _clip_processor(
-        images=image,
-        return_tensors="pt"
-    ).to(device)
+
+    inputs = _clip_processor(images=image, return_tensors="pt").to(device)
 
     with torch.no_grad():
         embedding = _clip_model.get_image_features(**inputs)
@@ -61,9 +48,11 @@ def get_clip_embedding(image: Image.Image) -> list:
     embedding = embedding / embedding.norm(dim=-1, keepdim=True)
     return embedding.squeeze().tolist()
 
+
 def get_phash(image: Image.Image) -> str:
     """Get perceptual hash of image"""
     return str(imagehash.phash(image))
+
 
 def fingerprint_image(image_path: str, metadata: dict) -> dict:
     """
@@ -71,7 +60,6 @@ def fingerprint_image(image_path: str, metadata: dict) -> dict:
     Layer 1 - pHash (fast, detects exact copies)
     Layer 2 - CLIP embedding (smart, detects edited copies)
     """
-    # 5️⃣ File error handling
     try:
         image = Image.open(image_path).convert("RGB")
     except Exception as e:
@@ -79,25 +67,27 @@ def fingerprint_image(image_path: str, metadata: dict) -> dict:
 
     asset_id = metadata.get("asset_id", str(uuid.uuid4()))
 
-    # Generate both fingerprints
     phash = get_phash(image)
     clip_embedding = get_clip_embedding(image)
 
-    # Store in ChromaDB
-    if asset_collection:
-        asset_collection.upsert(
-            ids=[asset_id],
-            embeddings=[clip_embedding],
-            metadatas=[{
-                **metadata,
-                "phash": phash,
-                "asset_id": asset_id,
-                "image_path": image_path,
-                "fingerprinted_at": datetime.now(timezone.utc).isoformat(),
-                "type": "image"
-            }],
-            documents=[f"Sports asset: {metadata.get('description', '')}"]
-        )
+    full_metadata = {
+        **metadata,
+        "phash": phash,
+        "asset_id": asset_id,
+        "image_path": image_path,
+        "fingerprinted_at": datetime.now(timezone.utc).isoformat(),
+        "type": "image",
+    }
+
+    # Store in Supabase pgvector
+    vector_store.upsert_asset_embedding(
+        asset_id=asset_id,
+        embedding=clip_embedding,
+        metadata=full_metadata,
+        document=f"Sports asset: {metadata.get('description', '')}",
+    )
+
+    total = vector_store.count_assets()
 
     return {
         "asset_id": asset_id,
@@ -105,77 +95,52 @@ def fingerprint_image(image_path: str, metadata: dict) -> dict:
         "duplicate": False,
         "stored_in_db": True,
         "device_used": device,
-        "total_assets": asset_collection.count() if asset_collection else 0
+        "total_assets": total,
     }
+
 
 def compare_image_to_db(image: Image.Image, threshold: float | None = None) -> list:
     """
-    Compare image against all stored assets
-    Returns matches above similarity threshold
+    Compare image against all stored assets.
+    Returns matches above similarity threshold.
     """
     if threshold is None:
         threshold = float(os.getenv("SIMILARITY_THRESHOLD", 0.85))
 
-    if asset_collection is None or asset_collection.count() == 0:
+    if vector_store.count_assets() == 0:
         return []
 
-    # Layer 1: pHash
     query_phash = imagehash.hex_to_hash(get_phash(image))
-
-    # Layer 2: CLIP similarity search
     query_embedding = get_clip_embedding(image)
+    if not query_embedding:
+        logger.warning("⚠️ CLIP embedding failed or model not initialized — returning no matches.")
+        return []
 
-    results = asset_collection.query(
-        query_embeddings=[query_embedding],
-        n_results=min(10, asset_collection.count()),
-        include=["metadatas", "distances", "documents"]
-    ) if asset_collection else None
-
-    matches = []
-    if results and results["ids"][0]:
-        for asset_id, distance, metadata in zip(
-            results["ids"][0],
-            results["distances"][0],
-            results["metadatas"][0]
-        ):
-            similarity = 1 - (distance / 2)
-
-            if similarity >= threshold:
-                stored_phash = imagehash.hex_to_hash(
-                    metadata.get("phash", "0" * 16)
-                )
-                phash_distance = query_phash - stored_phash
-
-                matches.append({
-                    "asset_id": metadata.get("asset_id"),
-                    "clip_similarity": round(similarity, 4),
-                    "phash_distance": phash_distance,
-                    "is_likely_copy": phash_distance < 10 or similarity > 0.92,
-                    "metadata": metadata
-                })
-
-    # 5️⃣ Sort by similarity score highest first
-    matches = sorted(
-        matches,
-        key=lambda x: x["clip_similarity"],
-        reverse=True
+    raw_matches = vector_store.query_assets(
+        query_embedding=query_embedding,
+        n_results=10,
+        threshold=threshold,
     )
 
-    return matches
+    matches = []
+    for row in raw_matches:
+        similarity = float(row.get("similarity", 0))
+        metadata = row.get("metadata") or {}
+
+        stored_phash = imagehash.hex_to_hash(metadata.get("phash", "0" * 16))
+        phash_distance = query_phash - stored_phash
+
+        matches.append({
+            "asset_id": metadata.get("asset_id"),
+            "clip_similarity": round(similarity, 4),
+            "phash_distance": phash_distance,
+            "is_likely_copy": phash_distance < 10 or similarity > 0.92,
+            "metadata": metadata,
+        })
+
+    return sorted(matches, key=lambda x: x["clip_similarity"], reverse=True)
+
 
 def get_all_assets() -> list:
-    """Get all stored assets"""
-    if asset_collection is None or asset_collection.count() == 0:
-        return []
-
-    results = asset_collection.get(include=["metadatas"])
-    seen = set()
-    assets = []
-
-    for metadata in results["metadatas"]:
-        asset_id = metadata.get("asset_id")
-        if asset_id not in seen:
-            seen.add(asset_id)
-            assets.append(metadata)
-
-    return assets
+    """Get all stored assets from pgvector"""
+    return vector_store.get_all_assets()

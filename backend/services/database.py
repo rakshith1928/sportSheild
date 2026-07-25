@@ -1,6 +1,6 @@
 """
 SportShield AI — Supabase Database Service
-Handles all PostgreSQL operations. ChromaDB remains for vector embeddings only.
+Handles all PostgreSQL operations and metadata persistence.
 """
 import os
 from datetime import datetime, timezone

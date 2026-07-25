@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from services.web_scanner import scan_google_for_asset
 from services.database import (
@@ -6,11 +6,9 @@ from services.database import (
     get_violations, check_violation_exists,
     get_scan_history, get_scan_by_id, get_recent_alerts
 )
-import chromadb
+from services.vector_store import get_asset_by_id
 import asyncio
 import logging
-import os
-from fastapi import Depends
 from dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -22,29 +20,11 @@ router = APIRouter()
 async def scan_asset(asset_id: str):
     """Trigger web scan for a specific asset"""
 
-    # Get asset metadata from ChromaDB
-    chroma_client = chromadb.PersistentClient(
-        path=os.getenv("CHROMA_DB_PATH", "./chroma_db")
-    )
-    collection = chroma_client.get_or_create_collection("sports_assets")
-
-    # Find asset by ID
+    # Get asset metadata from Supabase pgvector
     try:
-        result = collection.get(ids=[asset_id])
-        if not result or not result.get("ids"):
-            raise HTTPException(
-                status_code=404,
-                detail=f"Asset {asset_id} not found"
-            )
-        
-        metadatas = result.get("metadatas")
-        if not metadatas or len(metadatas) == 0:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Asset {asset_id} metadata missing"
-            )
-            
-        metadata = metadatas[0]
+        metadata = get_asset_by_id(asset_id)
+        if not metadata:
+            raise HTTPException(status_code=404, detail=f"Asset {asset_id} not found")
     except HTTPException:
         raise
     except Exception as e:

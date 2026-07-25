@@ -30,7 +30,6 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting SportShield AI...")
     os.makedirs(os.getenv("UPLOAD_DIR", "uploads"), exist_ok=True)
-    os.makedirs("chroma_db", exist_ok=True)
     logger.info("Loading CLIP model...")
     init_clip_model()
     logger.info("Initializing RAG knowledge base...")
