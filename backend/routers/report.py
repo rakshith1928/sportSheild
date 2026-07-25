@@ -106,14 +106,15 @@ async def download_report(report_id: str):
 
 
 @router.get("/list")
-async def list_reports():
-    """List all generated reports"""
+async def list_reports(limit: int = 50, offset: int = 0):
+    """List all generated reports with pagination"""
     try:
-        reports = db_get_reports()
-        return {"total": len(reports), "reports": reports}
+        return db_get_reports(limit=limit, offset=offset)
     except Exception:
         os.makedirs(REPORTS_DIR, exist_ok=True)
         files = [f for f in os.listdir(REPORTS_DIR) if f.endswith(".pdf")]
+        files_sorted = sorted(files, reverse=True)
+        paginated_files = files_sorted[offset:offset+limit]
         return {
             "total": len(files),
             "reports": [
@@ -122,6 +123,6 @@ async def list_reports():
                     "download_url": f"/report/download/{f.replace('.pdf', '')}",
                     "filename": f,
                 }
-                for f in sorted(files, reverse=True)
-            ],
+                for f in paginated_files
+            ]
         }

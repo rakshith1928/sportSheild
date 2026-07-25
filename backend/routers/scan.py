@@ -92,13 +92,9 @@ async def scan_asset(asset_id: str, request: Request):
 
 
 @router.get("/violations")
-async def get_all_violations(severity: str | None = None):
-    """Get all detected violations, with optional severity filter"""
-    violations = get_violations(severity=severity)
-    return {
-        "total": len(violations),
-        "violations": violations
-    }
+async def get_all_violations(severity: str | None = None, limit: int = 50, offset: int = 0):
+    """Get all detected violations, with optional severity filter and pagination"""
+    return get_violations(severity=severity, limit=limit, offset=offset)
 
 @router.get("/alerts")
 async def get_alerts(limit: int = 5, user = Depends(get_current_user)):
@@ -108,14 +104,11 @@ async def get_alerts(limit: int = 5, user = Depends(get_current_user)):
 
 
 @router.get("/violations/{asset_id}")
-async def get_violations_by_asset(asset_id: str):
-    """Get violations for a specific asset"""
-    violations = get_violations(asset_id=asset_id)
-    return {
-        "asset_id": asset_id,
-        "total": len(violations),
-        "violations": violations
-    }
+async def get_violations_by_asset(asset_id: str, limit: int = 50, offset: int = 0):
+    """Get violations for a specific asset with pagination"""
+    res = dict(get_violations(asset_id=asset_id, limit=limit, offset=offset))
+    res["asset_id"] = asset_id
+    return res
 
 
 @router.get("/history")

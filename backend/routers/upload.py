@@ -171,19 +171,10 @@ async def upload_asset(
                 logger.error(f"Failed to cleanup temp file {file_path}: {cleanup_err}")
 
 @router.get("/assets")
-async def list_assets(user = Depends(get_current_user)):
-    """List all protected assets for the logged-in user"""
+async def list_assets(limit: int = 50, offset: int = 0, user = Depends(get_current_user)):
+    """List protected assets for the logged-in user with pagination"""
     try:
-        supabase = get_supabase_client()
-        result = (
-            supabase.table("assets")
-            .select("*")
-            .eq("owner", user.id)
-            .order("created_at", desc=True)
-            .execute()
-        )
-        assets = result.data or []
-        return {"total": len(assets), "assets": assets}
+        return db_get_assets(user_id=user.id, limit=limit, offset=offset)
     except Exception as e:
         raise HTTPException(
             status_code=500,

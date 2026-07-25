@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { ViolationDetails } from '@/utils/api'
 import { ViolationDrawer } from './ViolationDrawer'
+import { PaginationControls } from '@/components/common/PaginationControls'
 
 interface Props {
   initialViolations: ViolationDetails[]
+  totalCount?: number
+  currentPage?: number
   currentSeverity?: string
 }
 
@@ -37,7 +40,7 @@ function getSeverityStyles(confidence: number) {
   }
 }
 
-export function ViolationsClient({ initialViolations, currentSeverity }: Props) {
+export function ViolationsClient({ initialViolations, totalCount, currentPage, currentSeverity }: Props) {
   const router = useRouter()
   const [selectedViolation, setSelectedViolation] = useState<ViolationDetails | null>(null)
 
@@ -212,6 +215,21 @@ export function ViolationsClient({ initialViolations, currentSeverity }: Props) 
         violation={selectedViolation} 
         onClose={() => setSelectedViolation(null)} 
       />
+
+      {/* Pagination Controls */}
+      {totalCount !== undefined && currentPage !== undefined && (
+        <PaginationControls
+          currentPage={currentPage}
+          totalItems={totalCount}
+          pageSize={10}
+          onPageChange={(newPage) => {
+            const query = new URLSearchParams()
+            if (currentSeverity) query.set('severity', currentSeverity)
+            query.set('page', newPage.toString())
+            router.push(`/dashboard/violations?${query.toString()}`)
+          }}
+        />
+      )}
     </div>
   )
 }

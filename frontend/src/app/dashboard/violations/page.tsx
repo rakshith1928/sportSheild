@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 
 type ViolationsSearchParams = {
   severity?: 'high' | 'medium' | 'low' | string
+  page?: string
 }
 
 export default async function ViolationsPage({
@@ -12,6 +13,7 @@ export default async function ViolationsPage({
 }: {
   searchParams: ViolationsSearchParams
 }) {
+  const currentPage = Math.max(1, parseInt(searchParams.page || '1', 10))
   const severity =
     ['high', 'medium', 'low'].includes(searchParams.severity ?? '')
       ? searchParams.severity
@@ -21,7 +23,7 @@ export default async function ViolationsPage({
   let hasError = false
 
   try {
-    const res = await getViolations(severity)
+    const res = await getViolations(severity, currentPage, 10)
     if (res) violationsData = res
   } catch (err) {
     console.error("Dashboard failed to load violations feed:", err)
@@ -49,6 +51,8 @@ export default async function ViolationsPage({
 
       <ViolationsClient 
         initialViolations={violations} 
+        totalCount={total}
+        currentPage={currentPage}
         currentSeverity={severity} 
       />
     </div>

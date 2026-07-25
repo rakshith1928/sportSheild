@@ -109,9 +109,10 @@ export async function getRecentAlerts() {
   }
 }
 
-export async function getAssets() {
+export async function getAssets(page = 1, limit = 50) {
   try {
-    return await fetchApi('/upload/assets')
+    const offset = (page - 1) * limit
+    return await fetchApi(`/upload/assets?limit=${limit}&offset=${offset}`)
   } catch (error) {
     console.error("Failed to fetch assets", error)
     return { total: 0, assets: [] }
@@ -135,11 +136,17 @@ export async function uploadAsset(formData: FormData) {
 // ---------------------------------------------------------
 
 export async function getViolations(
-  severity?: string
+  severity?: string,
+  page = 1,
+  limit = 50
 ): Promise<{ total: number; violations: ViolationDetails[] }> {
   try {
-    const query = severity ? `?severity=${encodeURIComponent(severity)}` : ''
-    return await fetchApi(`/scan/violations${query}`)
+    const offset = (page - 1) * limit
+    const params = new URLSearchParams()
+    if (severity) params.set('severity', severity)
+    params.set('limit', limit.toString())
+    params.set('offset', offset.toString())
+    return await fetchApi(`/scan/violations?${params.toString()}`)
   } catch (error) {
     console.error("Failed to fetch violations", error)
     return { total: 0, violations: [] }
@@ -147,10 +154,13 @@ export async function getViolations(
 }
 
 export async function getAssetViolations(
-  assetId: string
+  assetId: string,
+  page = 1,
+  limit = 50
 ): Promise<{ asset_id: string; total: number; violations: ViolationDetails[] }> {
   try {
-    return await fetchApi(`/scan/violations/${encodeURIComponent(assetId)}`)
+    const offset = (page - 1) * limit
+    return await fetchApi(`/scan/violations/${encodeURIComponent(assetId)}?limit=${limit}&offset=${offset}`)
   } catch (error) {
     console.error("Failed to fetch asset violations", error)
     return { asset_id: assetId, total: 0, violations: [] }
@@ -186,9 +196,10 @@ export async function generateReport(
   }
 }
 
-export async function getReports(): Promise<ReportsResponse> {
+export async function getReports(page = 1, limit = 50): Promise<ReportsResponse> {
   try {
-    return await fetchApi('/report/list')
+    const offset = (page - 1) * limit
+    return await fetchApi(`/report/list?limit=${limit}&offset=${offset}`)
   } catch (error) {
     console.error("Failed to fetch reports", error)
     return { total: 0, reports: [] }

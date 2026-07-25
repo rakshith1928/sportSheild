@@ -44,16 +44,18 @@ def insert_asset(metadata: dict) -> dict:
     result = client.table("assets").insert(row).execute()
     return cast(dict, result.data[0]) if result.data else row
 
-def get_assets() -> list[dict]:
-    """List all protected assets, newest first."""
+def get_assets(user_id: str | None = None, limit: int = 50, offset: int = 0) -> dict:
+    """List protected assets with pagination, newest first."""
     client = get_supabase_client()
-    result = (
-        client.table("assets")
-        .select("*")
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return cast(list[dict], result.data) or []
+    query = client.table("assets").select("*", count=CountMethod.exact).order("created_at", desc=True)
+    if user_id:
+        query = query.eq("owner", user_id)
+    
+    end_range = offset + limit - 1
+    result = query.range(offset, end_range).execute()
+    data = cast(list[dict], result.data) or []
+    total = getattr(result, "count", 0) or len(data)
+    return {"total": total, "assets": data}
 
 def get_dashboard_stats(user_id: str) -> dict:
     """Fetch aggregate statistics for the dashboard, filtered by user."""
@@ -165,20 +167,25 @@ def insert_violation(violation_data: dict, scan_id: str | None = None) -> dict:
 def get_violations(
     asset_id: str | None = None,
     severity: str | None = None,
-) -> list[dict]:
-    """Query violations with optional filters, sorted by similarity desc."""
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    """Query violations with optional filters and pagination, sorted by similarity desc."""
     client = get_supabase_client()
     query = (
         client.table("violations")
-        .select("*")
+        .select("*", count=CountMethod.exact)
         .order("clip_similarity", desc=True)
     )
     if asset_id:
         query = query.eq("asset_id", asset_id)
     if severity:
         query = query.eq("severity", severity)
-    result = query.execute()
-    return cast(list[dict], result.data) or []
+    end_range = offset + limit - 1
+    result = query.range(offset, end_range).execute()
+    data = cast(list[dict], result.data) or []
+    total = getattr(result, "count", 0) or len(data)
+    return {"total": total, "violations": data}
 
 def get_recent_alerts(user_id: str, limit: int = 5) -> list[dict]:
     """Fetch the most recent violations for a user's assets, formatted as alerts for the dashboard."""
@@ -240,13 +247,12 @@ def insert_report(report_meta: dict) -> dict:
     result = client.table("reports").insert(row).execute()
     return cast(dict, result.data[0]) if result.data else row
 
-def get_reports() -> list[dict]:
-    """List all reports, newest first."""
+def get_reports(limit: int = 50, offset: int = 0) -> dict:
+    """List all reports with pagination, newest first."""
     client = get_supabase_client()
-    result = (
-        client.table("reports")
-        .select("*")
-        .order("generated_at", desc=True)
-        .execute()
-    )
-    return cast(list[dict], result.data) or []
+    query = client.table("reports").select("*", count=CountMethod.exact).order("generated_at", desc=True)
+    end_range = offset + limit - 1
+    result = query.range(offset, end_range).execute()
+    data = cast(list[dict], result.data) or []
+    total = getattr(result, "count", 0) or len(data)
+    return {"total": total, "reports": data}
