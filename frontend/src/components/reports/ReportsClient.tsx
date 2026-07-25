@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
-import { ReportMeta, ViolationDetails, generateReport, getAssetViolations, getReports } from '@/utils/api'
+import { ReportMeta, ViolationDetails, generateReport, getAssetViolations, getReports, getReportJobStatus } from '@/utils/api'
 import { Asset } from './types'
 import { SeverityPill, CompileStep } from './ReportHelpers'
 
@@ -42,12 +42,38 @@ export function ReportsClient({ initialReports, assets }: Props) {
           return
         }
 
-        // Step 2: RAG enrichment + PDF compile (synchronous on backend)
+        // Step 2: Trigger non-blocking background job
         setCompileStep(2)
-        await generateReport(selectedAssetId, violations)
+        const genRes = await generateReport(selectedAssetId, violations)
 
-        // Step 3: Refetch from server — ensures timestamps/metadata are accurate
-        setCompileStep(3)
+        if (!genRes.job_id) {
+          throw new Error('Server failed to return a valid job ID.')
+        }
+
+        // Poll job status every 2 seconds
+        const jobId = genRes.job_id
+        await new Promise<void>((resolve, reject) => {
+          const interval = setInterval(async () => {
+            try {
+              const statusRes = await getReportJobStatus(jobId)
+              if (statusRes.status === 'processing') {
+                setCompileStep(2)
+              } else if (statusRes.status === 'done') {
+                clearInterval(interval)
+                setCompileStep(3)
+                resolve()
+              } else if (statusRes.status === 'failed') {
+                clearInterval(interval)
+                reject(new Error(statusRes.error || 'Background compilation failed.'))
+              }
+            } catch (pollErr) {
+              clearInterval(interval)
+              reject(pollErr)
+            }
+          }, 2000)
+        })
+
+        // Step 3: Refetch list from server
         const refreshed = await getReports().catch(() => null)
         if (refreshed) setReports(refreshed.reports)
 

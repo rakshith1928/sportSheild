@@ -28,9 +28,18 @@ export interface ExplainResponse {
 
 export interface GenerateReportResponse {
   success: boolean
-  report_id: string
-  download_url: string
-  violations_analyzed: number
+  job_id: string
+  status: string
+  message?: string
+}
+
+export interface JobStatusResponse {
+  job_id: string
+  status: 'queued' | 'processing' | 'done' | 'failed'
+  report_id?: string
+  download_url?: string
+  violations_analyzed?: number
+  error?: string
 }
 
 export interface ReportMeta {
@@ -192,6 +201,15 @@ export async function generateReport(
     })
   } catch (error) {
     console.error("Failed to generate report", error)
+    throw error
+  }
+}
+
+export async function getReportJobStatus(jobId: string): Promise<JobStatusResponse> {
+  try {
+    return await fetchApi(`/report/status/${encodeURIComponent(jobId)}`)
+  } catch (error) {
+    console.error(`Failed to fetch job status for ${jobId}`, error)
     throw error
   }
 }

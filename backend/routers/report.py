@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from services.report_generator import generate_report
 from services.rag_engine import explain_violation
 from services.database import insert_report as db_insert_report, get_reports as db_get_reports
 from services.vector_store import get_asset_by_id
+from services.job_store import create_job, update_job, get_job
 from typing import cast
 import logging
 import uuid
@@ -28,26 +29,13 @@ class ReportRequest(BaseModel):
     violations: list[Violation]
 
 
-@router.post("/generate")
-async def generate_violation_report(request: ReportRequest):
-    """Generate AI-powered PDF report for an asset"""
-
-    # Validate asset exists in pgvector
+def _process_report_background(job_id: str, request: ReportRequest, asset: dict):
+    """Background worker function for RAG enrichment and PDF generation."""
     try:
-        asset = get_asset_by_id(request.asset_id)
-        if not asset:
-            raise HTTPException(status_code=404, detail="Asset not found")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Asset error: {str(e)}")
+        update_job(job_id, {"status": "processing"})
+        os.makedirs(REPORTS_DIR, exist_ok=True)
 
-    os.makedirs(REPORTS_DIR, exist_ok=True)
-
-    try:
         enriched_violations = []
-
-        # RAG + LLM enrichment
         for v in request.violations:
             v_dict = v.model_dump()
             analysis = explain_violation(v_dict)
@@ -62,7 +50,7 @@ async def generate_violation_report(request: ReportRequest):
         report_id = str(uuid.uuid4())[:8].upper()
 
         file_path = generate_report(
-            asset=cast(dict, asset),
+            asset=asset,
             violations=cast(list[dict], enriched_violations),
             report_id=report_id,
             output_dir=REPORTS_DIR,
@@ -79,15 +67,60 @@ async def generate_violation_report(request: ReportRequest):
         except Exception as db_err:
             logger.warning(f"Supabase report insert failed (non-fatal): {db_err}")
 
-        return {
-            "success": True,
+        update_job(job_id, {
+            "status": "done",
             "report_id": report_id,
             "download_url": f"/report/download/{report_id}",
             "violations_analyzed": len(enriched_violations),
-        }
+        })
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
+        logger.error(f"Background report generation failed for job {job_id}: {e}")
+        update_job(job_id, {
+            "status": "failed",
+            "error": str(e),
+        })
+
+
+@router.post("/generate")
+async def generate_violation_report(request: ReportRequest, background_tasks: BackgroundTasks):
+    """Enqueue AI-powered PDF report compilation in a background task (non-blocking)."""
+
+    # Validate asset exists in pgvector
+    try:
+        asset = get_asset_by_id(request.asset_id)
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Asset error: {str(e)}")
+
+    job_id = str(uuid.uuid4())[:8].upper()
+    create_job(job_id)
+
+    background_tasks.add_task(
+        _process_report_background,
+        job_id=job_id,
+        request=request,
+        asset=cast(dict, asset),
+    )
+
+    return {
+        "success": True,
+        "job_id": job_id,
+        "status": "queued",
+        "message": "Report generation enqueued successfully"
+    }
+
+
+@router.get("/status/{job_id}")
+async def get_report_job_status(job_id: str):
+    """Query current status of a background report compilation job."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    return job
 
 
 @router.get("/download/{report_id}")
