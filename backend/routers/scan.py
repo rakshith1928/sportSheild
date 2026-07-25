@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from services.web_scanner import scan_google_for_asset
 from services.database import (
@@ -9,7 +9,7 @@ from services.database import (
 from services.vector_store import get_asset_by_id
 import asyncio
 import logging
-from dependencies import get_current_user
+from dependencies import get_current_user, limiter
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,8 @@ router = APIRouter()
 
 
 @router.post("/{asset_id}")
-async def scan_asset(asset_id: str):
+@limiter.limit("3/minute")
+async def scan_asset(asset_id: str, request: Request):
     """Trigger web scan for a specific asset"""
 
     # Get asset metadata from Supabase pgvector

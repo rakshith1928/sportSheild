@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 import os
 import uuid
@@ -13,7 +13,7 @@ from services.fingerprint import (
     compare_image_to_db
 )
 from services.database import insert_asset as db_insert_asset, get_assets as db_get_assets, get_supabase_client
-from dependencies import get_current_user
+from dependencies import get_current_user, limiter
 from fastapi import Depends
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,9 @@ ALLOWED_VIDEO_TYPES = {"video/mp4", "video/mpeg", "video/quicktime"}
 MAX_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", 50))
 
 @router.post("/asset")
+@limiter.limit("10/minute")
 async def upload_asset(
+    request: Request,
     file: UploadFile = File(...),
     sport: str = Form(...),
     team: str = Form(...),

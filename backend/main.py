@@ -24,6 +24,10 @@ from routers import upload, scan, explain, report, dashboard
 from services.rag_engine import init_rag
 from services.fingerprint import init_clip_model
 from services.database import get_supabase_client
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from dependencies import limiter
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,6 +56,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
+app.add_middleware(SlowAPIMiddleware)
 
 # CORS for Next.js frontend
 app.add_middleware(
