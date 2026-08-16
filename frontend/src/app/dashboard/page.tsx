@@ -84,7 +84,7 @@ export default async function DashboardPage() {
 
         <div>
           {alerts.length > 0 ? (
-            alerts.map((alert: any, index: number) => (
+            alerts.map((alert, index: number) => (
               <AlertRow
                 key={alert.id}
                 alert={alert}

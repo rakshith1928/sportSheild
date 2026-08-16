@@ -10,7 +10,7 @@ export default function NotFound() {
         <h1 className="text-6xl font-black text-white tracking-tighter mb-2">404</h1>
         <h2 className="text-2xl font-bold text-slate-200 mb-4">Page out of bounds</h2>
         <p className="text-slate-400 max-w-md mx-auto">
-          The page you're looking for doesn't exist or has been moved. Let's get you back in the game.
+          The page you&apos;re looking for doesn&apos;t exist or has been moved. Let&apos;s get you back in the game.
         </p>
       </div>
       

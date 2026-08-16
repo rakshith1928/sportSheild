@@ -25,11 +25,7 @@ export function ViolationDrawer({ violation, onClose }: Props) {
 
   // Trigger RAG API call when open
   useEffect(() => {
-    if (!violation) {
-      setData(null)
-      setError(null)
-      return
-    }
+    if (!violation) return
 
     let isMounted = true
     const analyze = async () => {
@@ -180,8 +176,9 @@ export function ViolationDrawer({ violation, onClose }: Props) {
                    
                    {/* AI Assessment */}
                    <div>
+                       {/* "//" prefix is the intended code-aesthetic header style, not a stray comment */}
                        <h3 className="text-xs font-mono text-slate-500 tracking-[0.2em] uppercase border-b border-white/5 pb-2 mb-4">
-                          // Automated Legal Assessment
+                          {'// Automated Legal Assessment'}
                        </h3>
                        <div className={`p-4 rounded border-l-2 bg-[#111415]
                           ${data.severity.toLowerCase() === 'high' ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.05)]' : 
@@ -194,8 +191,9 @@ export function ViolationDrawer({ violation, onClose }: Props) {
                    {/* Legal Precedents (RAG Context) */}
                    {data.legal_context && data.legal_context.length > 0 && (
                      <div>
+                         {/* "//" prefix is the intended code-aesthetic header style, not a stray comment */}
                          <h3 className="text-xs font-mono text-slate-500 tracking-[0.2em] uppercase border-b border-white/5 pb-2 mb-4">
-                            // Retrieved Legal Context (VDB)
+                            {'// Retrieved Legal Context (VDB)'}
                          </h3>
                          <div className="space-y-2">
                             {data.legal_context.map((ctx, idx) => (
@@ -214,8 +212,9 @@ export function ViolationDrawer({ violation, onClose }: Props) {
                    {/* DMCA Letter Output */}
                    <div>
                        <div className="flex justify-between items-end border-b border-white/5 pb-2 mb-4">
+                         {/* "//" prefix is the intended code-aesthetic header style, not a stray comment */}
                          <h3 className="text-xs font-mono text-slate-500 tracking-[0.2em] uppercase">
-                            // Drafted Takedown Notice
+                            {'// Drafted Takedown Notice'}
                          </h3>
                          <button 
                            onClick={copyTakedown}

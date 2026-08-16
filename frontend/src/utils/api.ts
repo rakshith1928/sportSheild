@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
+import type { Asset } from '@/components/reports/types'
 
 // Fallback to localhost if env variable is missing
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -62,6 +63,17 @@ export interface ReportsResponse {
   reports: ReportMeta[]
 }
 
+// Mirrors the alert shape built by backend get_recent_alerts()
+// (violations formatted for the dashboard).
+export interface AlertItem {
+  id: number
+  title: string
+  source: string
+  time: string
+  severity: 'high' | 'medium' | 'low'
+  status: string
+}
+
 /**
  * Server-side API fetcher.
  * Automatically injects the Supabase user session token into the Authorization header
@@ -116,7 +128,7 @@ export async function getDashboardStats() {
   }
 }
 
-export async function getRecentAlerts() {
+export async function getRecentAlerts(): Promise<AlertItem[]> {
   try {
     return await fetchApi('/scan/alerts?limit=5')
   } catch (error) {
@@ -125,7 +137,7 @@ export async function getRecentAlerts() {
   }
 }
 
-export async function getAssets(page = 1, limit = 50) {
+export async function getAssets(page = 1, limit = 50): Promise<{ total: number; assets: Asset[] }> {
   try {
     const offset = (page - 1) * limit
     return await fetchApi(`/upload/assets?limit=${limit}&offset=${offset}`)

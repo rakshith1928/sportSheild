@@ -23,7 +23,7 @@ export default async function AssetsPage() {
         
         {assets.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {assets.map((asset: any) => (
+            {assets.map((asset) => (
               <div key={asset.asset_id} className="bg-[#111415] border border-white/5 rounded-xl overflow-hidden group hover:border-[#FF6B6B]/30 transition-colors">
                 <div className="h-40 bg-slate-900 relative">
                   {/* Thumbnail Preview */}
