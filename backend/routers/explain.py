@@ -1,13 +1,13 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends, Body
 from fastapi.responses import JSONResponse
 from services.rag_engine import explain_violation, query_rag
-from dependencies import limiter
+from dependencies import limiter, get_current_user
 
 router = APIRouter()
 
 @router.post("/violation")
 @limiter.limit("5/minute")
-async def explain_violation_endpoint(violation: dict, request: Request):
+async def explain_violation_endpoint(violation: dict, request: Request, user = Depends(get_current_user)):
     """
     Use RAG + Groq LLM to explain a detected violation
     and recommend legal actions
@@ -59,7 +59,7 @@ async def explain_violation_endpoint(violation: dict, request: Request):
 
 
 @router.post("/search-laws")
-async def search_legal_knowledge(query: str, law: str | None = None):
+async def search_legal_knowledge(query: str, law: str | None = None, user = Depends(get_current_user)):
     """
     Search the legal knowledge base directly.
     Optionally filter by law type: dmca, india_copyright, sports_rights
@@ -79,7 +79,7 @@ async def search_legal_knowledge(query: str, law: str | None = None):
 
 @router.post("/batch")
 @limiter.limit("2/minute")
-async def explain_batch(violations: list, request: Request):
+async def explain_batch(request: Request, violations: list = Body(...), user = Depends(get_current_user)):
     """
     Explain multiple violations at once.
     Returns explanations sorted by confidence descending.

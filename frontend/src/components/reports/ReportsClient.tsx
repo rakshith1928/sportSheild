@@ -6,8 +6,6 @@ import { ReportMeta, ViolationDetails, generateReport, getAssetViolations, getRe
 import { Asset } from './types'
 import { SeverityPill, CompileStep } from './ReportHelpers'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
 interface Props {
   initialReports: ReportMeta[]
   assets: Asset[]
@@ -310,7 +308,7 @@ export function ReportsClient({ initialReports, assets }: Props) {
                   </div>
 
                   <a
-                    href={`${API_BASE_URL}${report.download_url}`}
+                    href={`/api/report/${report.report_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`Download report ${report.report_id}`}

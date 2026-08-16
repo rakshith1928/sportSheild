@@ -1,20 +1,26 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from services.report_generator import generate_report
 from services.rag_engine import explain_violation
-from services.database import insert_report as db_insert_report, get_reports as db_get_reports
+from services.database import insert_report as db_insert_report, get_reports as db_get_reports, get_report_by_id
 from services.vector_store import get_asset_by_id
 from services.job_store import create_job, update_job, get_job
+from dependencies import get_current_user
 from typing import cast
 import logging
-import uuid
 import os
+import re
+import uuid
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 REPORTS_DIR = "reports"
+
+# Report ids are generated as uuid4().hex[:8].upper() — enforce the exact shape
+# before touching the database or filesystem.
+REPORT_ID_RE = re.compile(r"^[A-F0-9]{8}$")
 
 
 class Violation(BaseModel):
@@ -83,13 +89,15 @@ def _process_report_background(job_id: str, request: ReportRequest, asset: dict)
 
 
 @router.post("/generate")
-async def generate_violation_report(request: ReportRequest, background_tasks: BackgroundTasks):
+async def generate_violation_report(request: ReportRequest, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
     """Enqueue AI-powered PDF report compilation in a background task (non-blocking)."""
 
-    # Validate asset exists in pgvector
+    # Validate asset exists in pgvector and belongs to the requesting user
     try:
         asset = get_asset_by_id(request.asset_id)
         if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        if asset.get("owner") != user.id:
             raise HTTPException(status_code=404, detail="Asset not found")
     except HTTPException:
         raise
@@ -115,7 +123,7 @@ async def generate_violation_report(request: ReportRequest, background_tasks: Ba
 
 
 @router.get("/status/{job_id}")
-async def get_report_job_status(job_id: str):
+async def get_report_job_status(job_id: str, user = Depends(get_current_user)):
     """Query current status of a background report compilation job."""
     job = get_job(job_id)
     if not job:
@@ -124,8 +132,16 @@ async def get_report_job_status(job_id: str):
 
 
 @router.get("/download/{report_id}")
-async def download_report(report_id: str):
-    """Download a generated PDF report"""
+async def download_report(report_id: str, user = Depends(get_current_user)):
+    """Download a generated PDF report (owner only)"""
+    if not REPORT_ID_RE.match(report_id):
+        raise HTTPException(status_code=404, detail=f"Report {report_id} not found")
+
+    # Tenant isolation: the report's asset must belong to the requesting user.
+    report = get_report_by_id(report_id, user_id=user.id)
+    if not report:
+        raise HTTPException(status_code=404, detail=f"Report {report_id} not found")
+
     file_path = os.path.join(REPORTS_DIR, f"{report_id}.pdf")
 
     if not os.path.exists(file_path):
@@ -139,10 +155,10 @@ async def download_report(report_id: str):
 
 
 @router.get("/list")
-async def list_reports(limit: int = 50, offset: int = 0):
-    """List all generated reports with pagination"""
+async def list_reports(limit: int = 50, offset: int = 0, user = Depends(get_current_user)):
+    """List reports for the logged-in user's assets with pagination"""
     try:
-        return db_get_reports(limit=limit, offset=offset)
+        return db_get_reports(limit=limit, offset=offset, user_id=user.id)
     except Exception:
         os.makedirs(REPORTS_DIR, exist_ok=True)
         files = [f for f in os.listdir(REPORTS_DIR) if f.endswith(".pdf")]

@@ -18,13 +18,17 @@ router = APIRouter()
 
 @router.post("/{asset_id}")
 @limiter.limit("3/minute")
-async def scan_asset(asset_id: str, request: Request):
-    """Trigger web scan for a specific asset"""
+async def scan_asset(asset_id: str, request: Request, user = Depends(get_current_user)):
+    """Trigger web scan for a specific asset (owner only)"""
 
     # Get asset metadata from Supabase pgvector
     try:
         metadata = get_asset_by_id(asset_id)
         if not metadata:
+            raise HTTPException(status_code=404, detail=f"Asset {asset_id} not found")
+        # Tenant isolation: only the asset owner may scan it.
+        # 404 (not 403) so asset ids cannot be enumerated across users.
+        if metadata.get("owner") != user.id:
             raise HTTPException(status_code=404, detail=f"Asset {asset_id} not found")
     except HTTPException:
         raise
@@ -92,9 +96,9 @@ async def scan_asset(asset_id: str, request: Request):
 
 
 @router.get("/violations")
-async def get_all_violations(severity: str | None = None, limit: int = 50, offset: int = 0):
-    """Get all detected violations, with optional severity filter and pagination"""
-    return get_violations(severity=severity, limit=limit, offset=offset)
+async def get_all_violations(severity: str | None = None, limit: int = 50, offset: int = 0, user = Depends(get_current_user)):
+    """Get detected violations for the logged-in user's assets, with optional severity filter and pagination"""
+    return get_violations(severity=severity, limit=limit, offset=offset, user_id=user.id)
 
 @router.get("/alerts")
 async def get_alerts(limit: int = 5, user = Depends(get_current_user)):
@@ -104,17 +108,24 @@ async def get_alerts(limit: int = 5, user = Depends(get_current_user)):
 
 
 @router.get("/violations/{asset_id}")
-async def get_violations_by_asset(asset_id: str, limit: int = 50, offset: int = 0):
-    """Get violations for a specific asset with pagination"""
+async def get_violations_by_asset(asset_id: str, limit: int = 50, offset: int = 0, user = Depends(get_current_user)):
+    """Get violations for a specific asset with pagination (owner only)"""
+    asset = get_asset_by_id(asset_id)
+    if not asset or asset.get("owner") != user.id:
+        raise HTTPException(status_code=404, detail=f"Asset {asset_id} not found")
     res = dict(get_violations(asset_id=asset_id, limit=limit, offset=offset))
     res["asset_id"] = asset_id
     return res
 
 
 @router.get("/history")
-async def scan_history(asset_id: str | None = None):
-    """List all past scans, optionally filtered by asset"""
-    scans = get_scan_history(asset_id=asset_id)
+async def scan_history(asset_id: str | None = None, user = Depends(get_current_user)):
+    """List past scans for the logged-in user's assets, optionally filtered by asset"""
+    if asset_id:
+        asset = get_asset_by_id(asset_id)
+        if not asset or asset.get("owner") != user.id:
+            raise HTTPException(status_code=404, detail=f"Asset {asset_id} not found")
+    scans = get_scan_history(asset_id=asset_id, user_id=user.id)
     return {
         "total": len(scans),
         "scans": scans
@@ -122,9 +133,17 @@ async def scan_history(asset_id: str | None = None):
 
 
 @router.get("/{scan_id}/status")
-async def scan_status(scan_id: str):
-    """Get real-time status of a specific scan"""
-    scan = get_scan_by_id(scan_id)
+async def scan_status(scan_id: str, user = Depends(get_current_user)):
+    """Get real-time status of a specific scan (owner only)"""
+    try:
+        scan = get_scan_by_id(scan_id)
+    except Exception:
+        scan = None
     if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Tenant isolation: the scan's asset must belong to the requesting user.
+    asset = get_asset_by_id(scan.get("asset_id", ""))
+    if not asset or asset.get("owner") != user.id:
         raise HTTPException(status_code=404, detail="Scan not found")
     return scan

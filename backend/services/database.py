@@ -128,10 +128,15 @@ def update_scan_status(
     )
     return cast(dict, result.data[0]) if result.data else update
 
-def get_scan_history(asset_id: str | None = None) -> list[dict]:
-    """List scan history, optionally filtered by asset."""
+def get_scan_history(asset_id: str | None = None, user_id: str | None = None) -> list[dict]:
+    """List scan history, optionally filtered by asset and by asset owner."""
     client = get_supabase_client()
-    query = client.table("scans").select("*").order("started_at", desc=True)
+    # Inner-join on assets so scans are scoped to the owner's assets
+    # (same join pattern as get_dashboard_stats).
+    select_clause = "*, assets!inner(owner)" if user_id else "*"
+    query = client.table("scans").select(select_clause).order("started_at", desc=True)
+    if user_id:
+        query = query.eq("assets.owner", user_id)
     if asset_id:
         query = query.eq("asset_id", asset_id)
     result = query.execute()
@@ -169,14 +174,23 @@ def get_violations(
     severity: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    user_id: str | None = None,
 ) -> dict:
-    """Query violations with optional filters and pagination, sorted by similarity desc."""
+    """Query violations with optional filters and pagination, sorted by similarity desc.
+
+    When `user_id` is given, results are scoped to that user's assets via an
+    inner join (violations whose asset row is missing or owned by someone
+    else are excluded).
+    """
     client = get_supabase_client()
+    select_clause = "*, assets!inner(owner)" if user_id else "*"
     query = (
         client.table("violations")
-        .select("*", count=CountMethod.exact)
+        .select(select_clause, count=CountMethod.exact)
         .order("clip_similarity", desc=True)
     )
+    if user_id:
+        query = query.eq("assets.owner", user_id)
     if asset_id:
         query = query.eq("asset_id", asset_id)
     if severity:
@@ -247,12 +261,28 @@ def insert_report(report_meta: dict) -> dict:
     result = client.table("reports").insert(row).execute()
     return cast(dict, result.data[0]) if result.data else row
 
-def get_reports(limit: int = 50, offset: int = 0) -> dict:
-    """List all reports with pagination, newest first."""
+def get_reports(limit: int = 50, offset: int = 0, user_id: str | None = None) -> dict:
+    """List reports with pagination, newest first, optionally scoped by asset owner."""
     client = get_supabase_client()
-    query = client.table("reports").select("*", count=CountMethod.exact).order("generated_at", desc=True)
+    select_clause = "*, assets!inner(owner)" if user_id else "*"
+    query = client.table("reports").select(select_clause, count=CountMethod.exact).order("generated_at", desc=True)
+    if user_id:
+        query = query.eq("assets.owner", user_id)
     end_range = offset + limit - 1
     result = query.range(offset, end_range).execute()
     data = cast(list[dict], result.data) or []
     total = getattr(result, "count", 0) or len(data)
     return {"total": total, "reports": data}
+
+def get_report_by_id(report_id: str, user_id: str) -> dict | None:
+    """Fetch a single report scoped to the user's assets (owner-join)."""
+    client = get_supabase_client()
+    result = (
+        client.table("reports")
+        .select("*, assets!inner(owner)")
+        .eq("report_id", report_id)
+        .eq("assets.owner", user_id)
+        .maybe_single()
+        .execute()
+    )
+    return cast(dict | None, result.data)
