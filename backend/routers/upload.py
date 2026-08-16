@@ -2,14 +2,15 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 import os
 import uuid
+import shutil
+import tempfile
 import aiofiles
 import logging
 from datetime import datetime, timezone
 from PIL import Image
 import io
 from services.fingerprint import (
-    fingerprint_image,
-    get_all_assets,
+    fingerprint_media,
     compare_image_to_db
 )
 from services.database import insert_asset as db_insert_asset, get_assets as db_get_assets, get_supabase_client
@@ -20,10 +21,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/mpeg", "video/quicktime"}
 MAX_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", 50))
+# Storage object extension is derived from the (validated) content type,
+# never from the untrusted user-supplied filename.
+EXT_BY_CONTENT_TYPE = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "video/mp4": ".mp4",
+    "video/mpeg": ".mpg",
+    "video/quicktime": ".mov",
+}
+
+
+def _delete_storage_object(supabase, filename: str) -> None:
+    """Best-effort removal of a Supabase Storage object to prevent orphans."""
+    try:
+        supabase.storage.from_("assets").remove([filename])
+    except Exception as cleanup_err:
+        logger.error(f"Failed to delete orphaned storage object {filename}: {cleanup_err}")
 
 @router.post("/asset")
 @limiter.limit("10/minute")
@@ -80,95 +98,97 @@ async def upload_asset(
                 detail=f"Invalid image file: {str(e)}"
             )
 
-    # Step 5 — Save file to disk temporarily for fingerprinting
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    # Step 5 — Stage file in OS temp (temporary processing storage only).
+    # Never inside the project/source tree; the per-request directory is
+    # removed in the `finally` block below on every success/failure path.
     asset_id = str(uuid.uuid4())
-    ext = os.path.splitext(file.filename or "")[1]
+    ext = EXT_BY_CONTENT_TYPE[file.content_type]
     filename = f"{asset_id}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
+    temp_dir = tempfile.mkdtemp(prefix=f"sportshield-upload-{asset_id[:8]}-")
+    file_path = os.path.join(temp_dir, filename)
 
-    async with aiofiles.open(file_path, "wb") as f:
-        await f.write(content)
-
-    # Step 5.5 — Upload to Supabase Storage
-    supabase = get_supabase_client()
     try:
-        supabase.storage.from_("assets").upload(
-            path=filename,
-            file=content,
-            file_options={"content-type": file.content_type}  # type: ignore
-        )
-        file_url = supabase.storage.from_("assets").get_public_url(filename)
-    except Exception as e:
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Supabase Storage upload failed: {str(e)}"
-        )
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(content)
 
-    # Step 6 — Build metadata
-    metadata = {
-        "asset_id": asset_id,
-        "filename": filename,
-        "original_filename": file.filename,
-        "sport": sport,
-        "team": team,
-        "event": event,
-        "description": description,
-        "owner": user.id,
-        "date": date,
-        "uploaded_at": datetime.now(timezone.utc).isoformat(),
-        "file_size_mb": round(size_mb, 2),
-        "content_type": file.content_type
-    }
-
-    # Step 7 — Fingerprint and store
-    try:
-        result = fingerprint_image(file_path, metadata)
-
-        # Handle bad image
-        if "error" in result:
+        # Step 5.5 — Upload to Supabase Storage
+        supabase = get_supabase_client()
+        try:
+            supabase.storage.from_("assets").upload(
+                path=filename,
+                file=content,
+                file_options={"content-type": file.content_type}  # type: ignore
+            )
+            file_url = supabase.storage.from_("assets").get_public_url(filename)
+        except Exception as e:
             raise HTTPException(
-                status_code=400,
-                detail=f"Image error: {result['error']}"
+                status_code=500,
+                detail=f"Supabase Storage upload failed: {str(e)}"
             )
 
-        # Step 8 — Dual-write to Supabase DB
-        metadata["file_url"] = file_url
-        metadata["phash"] = result.get("phash")
+        # Step 6 — Build metadata
+        metadata = {
+            "asset_id": asset_id,
+            "filename": filename,
+            "original_filename": file.filename,
+            "sport": sport,
+            "team": team,
+            "event": event,
+            "description": description,
+            "owner": user.id,
+            "date": date,
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+            "file_size_mb": round(size_mb, 2),
+            "content_type": file.content_type
+        }
+
+        # Step 7 — Fingerprint (image or video) and store.
+        # Anything that fails AFTER the Supabase upload must delete the
+        # cloud object so no orphaned storage objects remain.
         try:
-            db_insert_asset(metadata)
-        except Exception as db_err:
-            logger.warning(f"Supabase DB insert failed (non-fatal): {db_err}")
+            result = fingerprint_media(file_path, metadata, file.content_type)
 
-        # Success
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "asset_id": asset_id,
-                "filename": filename,
-                "file_url": file_url,
-                "fingerprint": result,
-                "message": "Asset fingerprinted, stored in cloud, and protected!"
-            }
-        )
+            # Handle bad media
+            if "error" in result:
+                kind = "Video" if file.content_type.startswith("video/") else "Image"
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{kind} error: {result['error']}"
+                )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Fingerprinting failed: {str(e)}"
-        )
-    finally:
-        # Cleanup local temporary file regardless of HTTP success or failure
-        if os.path.exists(file_path):
+            # Step 8 — Dual-write to Supabase DB
+            metadata["file_url"] = file_url
+            metadata["phash"] = result.get("phash")
             try:
-                os.remove(file_path)
-            except Exception as cleanup_err:
-                logger.error(f"Failed to cleanup temp file {file_path}: {cleanup_err}")
+                db_insert_asset(metadata)
+            except Exception as db_err:
+                logger.warning(f"Supabase DB insert failed (non-fatal): {db_err}")
+
+            # Success
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "asset_id": asset_id,
+                    "filename": filename,
+                    "file_url": file_url,
+                    "fingerprint": result,
+                    "message": "Asset fingerprinted, stored in cloud, and protected!"
+                }
+            )
+
+        except HTTPException:
+            _delete_storage_object(supabase, filename)
+            raise
+        except Exception as e:
+            _delete_storage_object(supabase, filename)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Fingerprinting failed: {str(e)}"
+            )
+    finally:
+        # Cleanup the temporary directory (file included) on every path
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 @router.get("/assets")
 async def list_assets(limit: int = 50, offset: int = 0, user = Depends(get_current_user)):
