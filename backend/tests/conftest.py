@@ -158,6 +158,7 @@ class FakeQuery:
         self.table = table
         self.selects = None
         self.filters = []
+        self.range_args = None
         self.single_mode = None
         self._pending_row = None
 
@@ -173,6 +174,7 @@ class FakeQuery:
         return self
 
     def range(self, a, b):
+        self.range_args = (a, b)
         return self
 
     def limit(self, n):
@@ -200,6 +202,7 @@ class FakeQuery:
                 "table": self.table,
                 "selects": self.selects,
                 "filters": list(self.filters),
+                "range": self.range_args,
                 "single_mode": self.single_mode,
             }
         )

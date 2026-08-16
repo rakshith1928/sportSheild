@@ -44,9 +44,22 @@ def insert_asset(metadata: dict) -> dict:
     result = client.table("assets").insert(row).execute()
     return cast(dict, result.data[0]) if result.data else row
 
+
+# S8: unbounded limit/offset let a client force Postgres to
+# materialize arbitrarily large result sets. Clamp at the data
+# layer so every caller is protected in one place.
+MAX_PAGE_SIZE = 200
+MAX_OFFSET = 10_000
+
+
+def _clamp_pagination(limit: int, offset: int) -> tuple[int, int]:
+    return max(1, min(int(limit), MAX_PAGE_SIZE)), max(0, min(int(offset), MAX_OFFSET))
+
+
 def get_assets(user_id: str | None = None, limit: int = 50, offset: int = 0) -> dict:
     """List protected assets with pagination, newest first."""
     client = get_supabase_client()
+    limit, offset = _clamp_pagination(limit, offset)
     query = client.table("assets").select("*", count=CountMethod.exact).order("created_at", desc=True)
     if user_id:
         query = query.eq("owner", user_id)
@@ -183,6 +196,7 @@ def get_violations(
     else are excluded).
     """
     client = get_supabase_client()
+    limit, offset = _clamp_pagination(limit, offset)
     select_clause = "*, assets!inner(owner)" if user_id else "*"
     query = (
         client.table("violations")
@@ -204,7 +218,8 @@ def get_violations(
 def get_recent_alerts(user_id: str, limit: int = 5) -> list[dict]:
     """Fetch the most recent violations for a user's assets, formatted as alerts for the dashboard."""
     client = get_supabase_client()
-    
+    limit = max(1, min(int(limit), MAX_PAGE_SIZE))
+
     result = (
         client.table("violations")
         .select("*, assets!inner(owner)")
@@ -264,6 +279,7 @@ def insert_report(report_meta: dict) -> dict:
 def get_reports(limit: int = 50, offset: int = 0, user_id: str | None = None) -> dict:
     """List reports with pagination, newest first, optionally scoped by asset owner."""
     client = get_supabase_client()
+    limit, offset = _clamp_pagination(limit, offset)
     select_clause = "*, assets!inner(owner)" if user_id else "*"
     query = client.table("reports").select(select_clause, count=CountMethod.exact).order("generated_at", desc=True)
     if user_id:
