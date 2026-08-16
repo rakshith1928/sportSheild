@@ -79,7 +79,7 @@ async def scan_asset(asset_id: str, request: Request, user = Depends(get_current
     update_scan_status(
         scan_id=scan_id,
         status="completed",
-        total_scanned=scan_result.get("urls_scanned", 0),
+        total_scanned=scan_result.get("total_scanned", 0),
         violations_found=scan_result.get("violations_found", 0),
     )
 
