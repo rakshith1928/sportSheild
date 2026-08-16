@@ -18,11 +18,18 @@ export interface ViolationDetails {
   detected_at: string
 }
 
+export interface LegalContextItem {
+  content: string
+  source: string
+  law: string
+  relevance_score: number
+}
+
 export interface ExplainResponse {
   success: boolean
   severity: string
   explanation: string
-  legal_context: string[]
+  legal_context: LegalContextItem[]
   recommended_action: string
 }
 

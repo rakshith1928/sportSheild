@@ -198,9 +198,13 @@ export function ViolationDrawer({ violation, onClose }: Props) {
                             // Retrieved Legal Context (VDB)
                          </h3>
                          <div className="space-y-2">
-                            {data.legal_context.map((law, idx) => (
-                               <div key={idx} className="bg-slate-900/80 border border-slate-800 p-3 rounded text-xs font-mono text-slate-400 break-words line-clamp-3 hover:line-clamp-none transition-all">
-                                  {law}
+                            {data.legal_context.map((ctx, idx) => (
+                               <div key={idx} className="group bg-slate-900/80 border border-slate-800 p-3 rounded text-xs font-mono text-slate-400 break-words">
+                                  <div className="flex items-center justify-between gap-2 mb-2">
+                                     <span className="text-[10px] uppercase tracking-[0.2em] text-[#FF6B6B]">{ctx.law}</span>
+                                     <span className="text-[10px] text-slate-500 shrink-0">{ctx.source} · {Math.round(ctx.relevance_score * 100)}%</span>
+                                  </div>
+                                  <p className="whitespace-pre-wrap line-clamp-3 group-hover:line-clamp-none transition-all">{ctx.content}</p>
                                </div>
                             ))}
                          </div>
