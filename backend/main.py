@@ -2,7 +2,6 @@ import logging
 import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
@@ -33,7 +32,6 @@ from dependencies import limiter
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting SportShield AI...")
-    os.makedirs(os.getenv("UPLOAD_DIR", "uploads"), exist_ok=True)
     logger.info("Loading CLIP model...")
     init_clip_model()
     logger.info("Initializing RAG knowledge base...")
@@ -61,20 +59,17 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
 app.add_middleware(SlowAPIMiddleware)
 
-# CORS for Next.js frontend
+# CORS for Next.js frontend.
+# allow_origins entries are literal strings — wildcards only work via
+# allow_origin_regex (Starlette fullmatches it against the Origin header).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://*.vercel.app"
-    ],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origin_regex=r"^https://([a-z0-9-]+\.)*vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Static files for uploaded assets
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Routers
 app.include_router(upload.router, prefix="/upload", tags=["Upload"])
