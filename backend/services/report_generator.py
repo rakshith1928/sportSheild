@@ -10,8 +10,20 @@ from reportlab.platypus import (
     TableStyle, HRFlowable, PageBreak
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from xml.sax.saxutils import escape
 
 logger = logging.getLogger(__name__)
+
+
+def _esc(value) -> str:
+    """Escape dynamic text for ReportLab Paragraph's XML parser.
+
+    ReportLab 4.x tolerates malformed XML but silently corrupts it:
+    a bare '&' in a URL is mangled by entity scanning ("v=1&f=mp4" →
+    "v=1&f;=mp4") and '<' '>' in LLM text is parsed as markup. Escaping
+    makes the rendered text byte-exact.
+    """
+    return escape(str(value))
 
 # Color palette
 PRIMARY = colors.HexColor("#1a1a2e")
@@ -212,7 +224,7 @@ def violation_card(story, styles, violation: dict, index: int):
         Paragraph(f"Violation #{index + 1}", ParagraphStyle(
             "VH", fontSize=11, fontName="Helvetica-Bold", textColor=WHITE
         )),
-        Paragraph(f"● {severity}", ParagraphStyle(
+        Paragraph(f"● {_esc(severity)}", ParagraphStyle(
             "VS", fontSize=10, fontName="Helvetica-Bold",
             textColor=WHITE, alignment=TA_RIGHT
         ))
@@ -231,15 +243,15 @@ def violation_card(story, styles, violation: dict, index: int):
     # Card body
     body_rows = [
         [Paragraph("Page URL", styles["label"]),
-         Paragraph(violation.get("page_url", "N/A")[:80], styles["url"])],
+         Paragraph(_esc(violation.get("page_url", "N/A"))[:120], styles["url"])],
         [Paragraph("Image URL", styles["label"]),
-         Paragraph(violation.get("image_url", "N/A")[:80], styles["url"])],
+         Paragraph(_esc(violation.get("image_url", "N/A"))[:120], styles["url"])],
         [Paragraph("Confidence", styles["label"]),
-         Paragraph(f"{confidence}%", styles["body"])],
+         Paragraph(_esc(f"{confidence}%"), styles["body"])],
         [Paragraph("Similarity Score", styles["label"]),
-         Paragraph(str(violation.get("clip_similarity", "N/A")), styles["body"])],
+         Paragraph(_esc(violation.get("clip_similarity", "N/A")), styles["body"])],
         [Paragraph("Detected At", styles["label"]),
-         Paragraph(violation.get("detected_at", "N/A"), styles["body"])],
+         Paragraph(_esc(violation.get("detected_at", "N/A")), styles["body"])],
     ]
 
     body_table = Table(body_rows, colWidths=[1.5 * inch, 5 * inch])
@@ -256,7 +268,7 @@ def violation_card(story, styles, violation: dict, index: int):
     # Legal explanation
     explanation = violation.get("explanation", "")
     if explanation:
-        exp_data = [[Paragraph(explanation, styles["body"])]]
+        exp_data = [[Paragraph(_esc(explanation), styles["body"])]]
         exp_table = Table(exp_data, colWidths=[6.5 * inch])
         exp_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), WHITE),
@@ -276,7 +288,7 @@ def violation_card(story, styles, violation: dict, index: int):
                 "AL", fontSize=9, fontName="Helvetica-Bold",
                 textColor=sev_color
             )),
-            Paragraph(action, styles["body"])
+            Paragraph(_esc(action), styles["body"])
         ]]
         action_table = Table(action_data, colWidths=[1.8 * inch, 4.7 * inch])
         action_table.setStyle(TableStyle([
