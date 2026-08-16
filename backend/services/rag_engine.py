@@ -198,7 +198,10 @@ Takedown Process:
 
     try:
         response = groq_client.chat.completions.create(
-            model="llama3-70b-8192",
+            # Env-configurable so a model retirement can be handled with a
+            # config change, not a code deploy. Default is the current
+            # Groq 70B model (the original llama3-70b-8192 was retired).
+            model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
             messages=[
                 {
                     "role": "system",

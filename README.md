@@ -31,7 +31,7 @@ SportShield AI protects sports media organizations from copyright theft at scale
 | **Vector Search** | ChromaDB |
 | **Web Scanning** | Google Custom Search API |
 | **RAG Knowledge Base** | LangChain + ChromaDB |
-| **LLM Explanations** | Groq (`llama3-70b-8192`) |
+| **LLM Explanations** | Groq (`llama-3.3-70b-versatile`, configurable via `GROQ_MODEL`) |
 | **Backend** | FastAPI + Python |
 | **Frontend** | Next.js 15 (App Router) + Tailwind CSS v4 |
 | **Auth** | Supabase Auth (SSR) |

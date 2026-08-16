@@ -7,6 +7,7 @@ these tests pin the backend side of that contract so a silent
 shape change here cannot silently break the UI again (audit B2).
 """
 import pytest
+from types import SimpleNamespace
 from langchain.schema import Document
 
 import services.rag_engine as rag_mod
@@ -71,3 +72,58 @@ def test_query_rag_disabled_when_no_vectorstore():
         assert rag_mod.query_rag("anything", k=3) == []
     finally:
         rag_mod.rag_vectorstore = original
+
+
+# ---------------------------------------------------------------------------
+# Groq model selection (audit B7)
+#
+# The hardcoded 'llama3-70b-8192' model was retired by Groq in 2025, so
+# every LLM explanation call errored and silently fell back to the static
+# template. The model must be env-configurable with a live default.
+# ---------------------------------------------------------------------------
+
+class FakeGroqCompletions:
+    def __init__(self):
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="LLM: DMCA §512 applies."))]
+        )
+
+
+class FakeGroqClient:
+    def __init__(self):
+        self.chat = SimpleNamespace(completions=FakeGroqCompletions())
+
+
+@pytest.fixture
+def fake_groq(monkeypatch):
+    client = FakeGroqClient()
+    monkeypatch.setattr(rag_mod, "groq_client", client)
+    return client
+
+
+def _violation_payload():
+    return {
+        "image_url": "https://cdn.example.com/img.jpg",
+        "page_url": "https://pirate.example.com/watch?v=1&f=mp4",
+        "clip_similarity": 0.95,
+        "is_likely_copy": True,
+        "detected_at": "2026-08-16T10:00:00Z",
+    }
+
+
+def test_explain_uses_env_configured_model(fake_groq, monkeypatch):
+    monkeypatch.setenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    result = rag_mod.explain_violation(_violation_payload())
+    assert fake_groq.chat.completions.calls[0]["model"] == "llama-3.1-8b-instant"
+    assert result["explanation"] == "LLM: DMCA §512 applies."  # passthrough, not fallback
+    assert result["severity"] == "HIGH"
+
+
+def test_explain_defaults_to_live_groq_model(fake_groq, monkeypatch):
+    monkeypatch.delenv("GROQ_MODEL", raising=False)
+    rag_mod.explain_violation(_violation_payload())
+    assert fake_groq.chat.completions.calls[0]["model"] == "llama-3.3-70b-versatile"
