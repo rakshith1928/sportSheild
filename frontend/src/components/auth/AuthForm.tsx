@@ -56,6 +56,13 @@ export default function AuthForm() {
           setMessage('Login successful! Redirecting...')
           router.push('/dashboard')
           router.refresh()
+        } else {
+          // Email confirmation is enabled and this account isn't verified:
+          // Supabase returns no session and no error. Tell the user instead
+          // of silently re-enabling the button.
+          setMessage(
+            'Your email isn\'t verified yet. Please check your inbox for the confirmation link, then try again.'
+          )
         }
       }
     } catch (err: unknown) {
