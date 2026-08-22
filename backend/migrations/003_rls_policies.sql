@@ -29,19 +29,19 @@ create policy "users read own assets"
 create policy "users read scans of own assets"
   on scans for select to authenticated
   using (exists (
-    select 1 from assets a where a.asset_id::text = scans.asset_id::text and a.owner = auth.uid()
+    select 1 from assets a where a.asset_id::text = scans.asset_id::text and a.owner::text = auth.uid()::text
   ));
 
 create policy "users read violations of own assets"
   on violations for select to authenticated
   using (exists (
-    select 1 from assets a where a.asset_id::text = violations.asset_id::text and a.owner = auth.uid()
+    select 1 from assets a where a.asset_id::text = violations.asset_id::text and a.owner::text = auth.uid()::text
   ));
 
 create policy "users read reports of own assets"
   on reports for select to authenticated
   using (exists (
-    select 1 from assets a where a.asset_id::text = reports.asset_id::text and a.owner = auth.uid()
+    select 1 from assets a where a.asset_id::text = reports.asset_id::text and a.owner::text = auth.uid()::text
   ));
 
 -- ─────────────────────────────────────────────────────────────
