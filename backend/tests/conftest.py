@@ -124,7 +124,10 @@ def clip_model_off(monkeypatch):
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    # The limiter counts requests per process/IP across tests; disable it so
+    # suites making many /upload/asset calls don't trip 10/minute 429s.
+    monkeypatch.setattr(dependencies_mod.limiter, "enabled", False)
     app = FastAPI()
     app.include_router(upload_mod.router, prefix="/upload")
     app.dependency_overrides[get_current_user] = (

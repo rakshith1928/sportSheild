@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 import os
@@ -123,7 +124,7 @@ async def upload_asset(
         if file.content_type in ALLOWED_IMAGE_TYPES:
             try:
                 image = Image.open(io.BytesIO(content)).convert("RGB")
-                duplicates = compare_image_to_db(image)
+                duplicates = await asyncio.to_thread(compare_image_to_db, image)
                 if duplicates:
                     # Redact stored metadata: the caller only needs to know THAT
                     # a match exists, not other users' owner/description/file_url.
@@ -188,7 +189,9 @@ async def upload_asset(
         # Anything that fails AFTER the Supabase upload must delete the
         # cloud object so no orphaned storage objects remain.
         try:
-            result = fingerprint_media(file_path, metadata, file.content_type)
+            result = await asyncio.to_thread(
+                fingerprint_media, file_path, metadata, file.content_type
+            )
 
             # Handle bad media
             if "error" in result:

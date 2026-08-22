@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request, Depends, Body
 from fastapi.responses import JSONResponse
+import asyncio
 import logging
 from services.rag_engine import explain_violation, query_rag
 from dependencies import limiter, get_current_user
@@ -38,7 +39,7 @@ async def explain_violation_endpoint(violation: dict, request: Request, user = D
         )
 
     try:
-        result = explain_violation(violation)
+        result = await asyncio.to_thread(explain_violation, violation)
 
         return JSONResponse(
             status_code=200,
@@ -71,7 +72,7 @@ async def search_legal_knowledge(query: str, law: str | None = None, user = Depe
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
 
-    results = query_rag(query, law_filter=law)
+    results = await asyncio.to_thread(query_rag, query, law_filter=law)
 
     return {
         "query": query,
@@ -105,7 +106,7 @@ async def explain_batch(request: Request, violations: list = Body(...), user = D
 
     for i, violation in enumerate(violations):
         try:
-            result = explain_violation(violation)
+            result = await asyncio.to_thread(explain_violation, violation)
             results.append({
                 "violation_url": violation.get("page_url"),
                 "asset_id": violation.get("asset_id"),

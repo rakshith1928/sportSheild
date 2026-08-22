@@ -78,14 +78,19 @@ async def scan_google_for_asset(
     seen_urls = set()
 
     try:
-        service: Any = build_google_client()
+        def _run_cse() -> dict:
+            # Sync Google API client work — must stay off the event loop.
+            service: Any = build_google_client()
+            if not service:
+                return {}
+            return service.cse().list(
+                q=query,
+                cx=GOOGLE_CSE_ID,
+                searchType="image",
+                num=10
+            ).execute()
 
-        result = service.cse().list(
-            q=query,
-            cx=GOOGLE_CSE_ID,
-            searchType="image",
-            num=10
-        ).execute() if service else {}
+        result = await asyncio.to_thread(_run_cse)
 
         # Handle empty results safely
         items = result.get("items", []) or []
@@ -123,7 +128,9 @@ async def scan_google_for_asset(
                 continue
 
             # Compare against protected assets
-            matches = compare_image_to_db(img, threshold=threshold)
+            matches = await asyncio.to_thread(
+                compare_image_to_db, img, threshold=threshold
+            )
 
             # Filter for this specific asset
             asset_matches = [
