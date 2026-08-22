@@ -43,7 +43,7 @@ npm run build   # Production build
 npm run lint    # ESLint
 ```
 
-> **Note:** No test suite is currently configured. Testing is done manually.
+> **Note:** Backend tests live in `backend/tests/` (pytest — `pip install -r requirements-dev.txt`, then `python -m pytest tests/`). Frontend has no test framework; type-check with `npm exec -- tsc --noEmit` and lint with `npm run lint`. CI (`.github/workflows/ci.yml`) runs pytest + tsc + eslint on every push.
 
 ## Navigating the Codebase
 
@@ -73,7 +73,7 @@ npm run lint    # ESLint
 - **Next.js 16:** APIs and conventions may differ from older versions.
 - **`window` / `document` usage:** Do not use in Server Components. Only use in Client Components (`"use client"` or `use client` directive).
 - **Server-side data fetching:** Use `async/await` directly in Server Components. Do not wrap them in `useEffect`.
-- **No test framework:** The project relies on manual testing of the UI and API.
+- **Frontend has no test framework:** rely on tsc, eslint, and manual UI testing. Backend changes must keep `python -m pytest tests/` green.
 
 ## Additional Resources
 
