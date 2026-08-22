@@ -300,7 +300,7 @@ export function ReportsClient({ initialReports, assets }: Props) {
                   </div>
 
                   <div className="font-mono text-[10px] text-slate-500">
-                    {new Date(report.created_at).toLocaleString('en-US', {
+                    {new Date(report.generated_at).toLocaleString('en-US', {
                       month: 'short', day: '2-digit',
                       hour: '2-digit', minute: '2-digit',
                       hour12: false,

@@ -289,6 +289,9 @@ def insert_report(report_meta: dict) -> dict:
         "violations_analyzed": report_meta.get("violations_analyzed", 0),
         "file_path": report_meta.get("file_path"),
         "download_url": report_meta.get("download_url"),
+        # Written explicitly so the field is never NULL even if the live
+        # table has no default (frontend renders this as the timestamp).
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     result = client.table("reports").insert(row).execute()
     return cast(dict, result.data[0]) if result.data else row

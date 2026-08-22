@@ -55,7 +55,8 @@ export interface ReportMeta {
   asset_id: string
   download_url: string
   violations_analyzed: number
-  created_at: string
+  // Column name in the reports table (backend orders by it).
+  generated_at: string
 }
 
 export interface ReportsResponse {
