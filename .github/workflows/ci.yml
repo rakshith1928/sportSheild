@@ -27,7 +27,7 @@ jobs:
       # CPU-only torch first: keeps the install from pulling ~2.5GB of
       # CUDA wheels that the test suite never uses.
       - name: Install CPU-only torch
-        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+        run: pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
@@ -35,11 +35,8 @@ jobs:
       - name: Run tests
         run: python -m pytest tests/ -q
 
-      # Advisory: 2024-era pinned deps have known advisories until the
-      # dependency-upgrade pass. Non-blocking for now; flip to blocking
-      # (remove continue-on-error) once a clean scan is achievable.
-      - name: pip-audit (advisory)
-        continue-on-error: true
+      # Blocking: the dependency tree was re-pinned in 2026-08 and scans clean.
+      - name: pip-audit
         run: |
           pip install pip-audit
           pip-audit -r requirements.txt
@@ -67,7 +64,6 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Advisory for now, same as pip-audit above.
-      - name: npm audit (advisory)
-        continue-on-error: true
-        run: npm audit --audit-level=high || true
+      # Blocking: next@16.3.2+ resolves all known advisories.
+      - name: npm audit
+        run: npm audit --audit-level=high

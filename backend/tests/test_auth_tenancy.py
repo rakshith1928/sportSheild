@@ -45,7 +45,8 @@ AUTH_MATRIX = [
                          ids=[f"{m} {p}" for m, p, _, _ in AUTH_MATRIX])
 def test_requires_authentication(full_client, db_env, method, path, body, params):
     resp = full_client.request(method, path, json=body, params=params)
-    assert resp.status_code == 403, (
+    # FastAPI's HTTPBearer returns 401 (RFC 6750) for missing credentials
+    assert resp.status_code in (401, 403), (
         f"{method} {path} must require authentication, got {resp.status_code}"
     )
 

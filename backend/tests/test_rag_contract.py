@@ -8,7 +8,7 @@ shape change here cannot silently break the UI again (audit B2).
 """
 import pytest
 from types import SimpleNamespace
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 import services.rag_engine as rag_mod
 
