@@ -20,6 +20,7 @@ import torch
 from PIL import Image
 
 import services.fingerprint as fingerprint
+import routers.upload as upload_mod
 from conftest import make_png_bytes
 
 PHASH_RE = re.compile(r"^[0-9a-f]{16}$")
@@ -272,3 +273,77 @@ def test_temp_file_deleted_on_failure(client, media_spy):
     assert media_spy["existed_during_processing"] is True
     assert not os.path.exists(path)
     assert not os.path.exists(os.path.dirname(path))
+
+
+# ---------------------------------------------------------------------------
+# 6. Oversized uploads are rejected during streaming (no full buffering)
+# ---------------------------------------------------------------------------
+
+def test_oversized_upload_rejected_before_full_buffer(client, monkeypatch, fake_supabase):
+    """A body larger than the cap is rejected mid-stream: no storage upload,
+    no orphaned temp dirs, generic 400."""
+    monkeypatch.setattr(upload_mod, "MAX_SIZE_MB", 1)
+    payload = b"\x89PNG\r\n\x1a\n" + b"\x00" * (2 * 1024 * 1024)  # 2MB > 1MB cap
+
+    resp = client.post(
+        "/upload/asset",
+        files={"file": ("big.png", payload, "image/png")},
+        data={"sport": "basketball", "team": "lakers"},
+    )
+
+    assert resp.status_code == 400
+    assert "too large" in resp.json()["detail"].lower()
+    assert fake_supabase["uploads"] == []
+
+    leftovers = [
+        d for d in os.listdir(tempfile.gettempdir())
+        if d.startswith("sportshield-upload-")
+    ]
+    assert leftovers == []
+
+
+# ---------------------------------------------------------------------------
+# 7. Streaming uploader aborts mid-transfer on oversized bodies
+# ---------------------------------------------------------------------------
+
+class FakeUploadFile:
+    """Serves fixed-size chunks; records how many reads were consumed."""
+
+    def __init__(self, chunk: bytes, count: int):
+        self._chunk = chunk
+        self._remaining = count
+        self.read_count = 0
+
+    async def read(self, n=-1):
+        if self._remaining <= 0:
+            return b""
+        self._remaining -= 1
+        self.read_count += 1
+        return self._chunk
+
+
+def test_stream_uploader_happy_path(tmp_path):
+    import asyncio
+    dest = tmp_path / "f.bin"
+    up = FakeUploadFile(b"A" * 600_000, 3)
+    total = asyncio.run(
+        upload_mod.stream_upload_to_disk(up, str(dest), 5 * 1024 * 1024)
+    )
+    assert total == 1_800_000
+    assert dest.read_bytes() == b"A" * 1_800_000
+
+
+def test_stream_uploader_aborts_without_consuming_all_chunks(tmp_path):
+    """A buffered implementation would consume all 10 chunks (6MB) into
+    memory before noticing the cap; the streaming one must give up after
+    the second chunk crosses 1MB."""
+    import asyncio
+    dest = tmp_path / "f.bin"
+    up = FakeUploadFile(b"B" * 600_000, 10)
+    with pytest.raises(upload_mod.FileTooLargeError):
+        asyncio.run(
+            upload_mod.stream_upload_to_disk(up, str(dest), 1024 * 1024)
+        )
+    assert up.read_count <= 3, (
+        f"read {up.read_count} chunks — implementation is buffering, not streaming"
+    )

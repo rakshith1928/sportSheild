@@ -43,6 +43,35 @@ def _delete_storage_object(supabase, filename: str) -> None:
     except Exception as cleanup_err:
         logger.error(f"Failed to delete orphaned storage object {filename}: {cleanup_err}")
 
+
+STREAM_CHUNK_SIZE = 1024 * 1024  # 1MB
+
+
+class FileTooLargeError(Exception):
+    """Raised when a streamed upload crosses the configured byte cap."""
+
+
+async def stream_upload_to_disk(upload_file, dest_path: str, max_bytes: int,
+                                chunk_size: int = STREAM_CHUNK_SIZE) -> int:
+    """Stream an UploadFile to disk in chunks, enforcing max_bytes.
+
+    Aborts mid-transfer (without reading the rest of the body into memory)
+    once the cap is crossed. Returns the number of bytes written.
+    """
+    written = 0
+    async with aiofiles.open(dest_path, "wb") as out:
+        while True:
+            chunk = await upload_file.read(chunk_size)
+            if not chunk:
+                break
+            written += len(chunk)
+            if written > max_bytes:
+                raise FileTooLargeError(
+                    f"upload exceeded {max_bytes} bytes after {written} written"
+                )
+            await out.write(chunk)
+    return written
+
 @router.post("/asset")
 @limiter.limit("10/minute")
 async def upload_asset(
@@ -65,51 +94,7 @@ async def upload_asset(
             detail=f"File type {file.content_type} not supported."
         )
 
-    # Step 2 — Read content
-    content = await file.read()
-
-    # Step 3 — Validate size
-    size_mb = len(content) / (1024 * 1024)
-    if size_mb > MAX_SIZE_MB:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large ({size_mb:.1f}MB). Max {MAX_SIZE_MB}MB."
-        )
-
-    # Step 4 — Check duplicate BEFORE saving to disk
-    if file.content_type in ALLOWED_IMAGE_TYPES:
-        try:
-            image = Image.open(io.BytesIO(content)).convert("RGB")
-            duplicates = compare_image_to_db(image)
-            if duplicates:
-                # Redact stored metadata: the caller only needs to know THAT
-                # a match exists, not other users' owner/description/file_url.
-                redacted_matches = [
-                    {
-                        "asset_id": m.get("asset_id"),
-                        "clip_similarity": m.get("clip_similarity"),
-                        "phash_distance": m.get("phash_distance"),
-                        "is_likely_copy": m.get("is_likely_copy"),
-                    }
-                    for m in duplicates
-                ]
-                return JSONResponse(
-                    status_code=409,
-                    content={
-                        "success": False,
-                        "duplicate": True,
-                        "message": "This asset is already protected!",
-                        "matches": redacted_matches
-                    }
-                )
-        except Exception as e:
-            # If image can't be read at all, reject immediately
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid image file: {str(e)}"
-            )
-
-    # Step 5 — Stage file in OS temp (temporary processing storage only).
+    # Step 2 — Stage file in OS temp (temporary processing storage only).
     # Never inside the project/source tree; the per-request directory is
     # removed in the `finally` block below on every success/failure path.
     asset_id = str(uuid.uuid4())
@@ -119,8 +104,53 @@ async def upload_asset(
     file_path = os.path.join(temp_dir, filename)
 
     try:
-        async with aiofiles.open(file_path, "wb") as f:
-            await f.write(content)
+        # Step 3 — Stream to disk with a hard byte cap. Oversized bodies are
+        # rejected mid-transfer instead of being buffered fully in memory.
+        try:
+            size_bytes = await stream_upload_to_disk(
+                file, file_path, MAX_SIZE_MB * 1024 * 1024
+            )
+        except FileTooLargeError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Max {MAX_SIZE_MB}MB."
+            )
+        size_mb = size_bytes / (1024 * 1024)
+
+        # Step 4 — Load size-verified bytes for fingerprinting/storage.
+        with open(file_path, "rb") as fh:
+            content = fh.read()
+        if file.content_type in ALLOWED_IMAGE_TYPES:
+            try:
+                image = Image.open(io.BytesIO(content)).convert("RGB")
+                duplicates = compare_image_to_db(image)
+                if duplicates:
+                    # Redact stored metadata: the caller only needs to know THAT
+                    # a match exists, not other users' owner/description/file_url.
+                    redacted_matches = [
+                        {
+                            "asset_id": m.get("asset_id"),
+                            "clip_similarity": m.get("clip_similarity"),
+                            "phash_distance": m.get("phash_distance"),
+                            "is_likely_copy": m.get("is_likely_copy"),
+                        }
+                        for m in duplicates
+                    ]
+                    return JSONResponse(
+                        status_code=409,
+                        content={
+                            "success": False,
+                            "duplicate": True,
+                            "message": "This asset is already protected!",
+                            "matches": redacted_matches
+                        }
+                    )
+            except Exception as e:
+                # If image can't be read at all, reject immediately
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid image file: {str(e)}"
+                )
 
         # Step 5.5 — Upload to Supabase Storage
         supabase = get_supabase_client()
