@@ -84,7 +84,8 @@ def _process_report_background(job_id: str, request: ReportRequest, asset: dict)
         logger.error(f"Background report generation failed for job {job_id}: {e}")
         update_job(job_id, {
             "status": "failed",
-            "error": str(e),
+            # Job status is client-visible; keep the raw exception server-side.
+            "error": "Report generation failed",
         })
 
 
@@ -101,8 +102,11 @@ async def generate_violation_report(request: ReportRequest, background_tasks: Ba
             raise HTTPException(status_code=404, detail="Asset not found")
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Asset error: {str(e)}")
+        logger.error(f"Asset lookup failed for {request.asset_id}: {e}")
+        raise HTTPException(status_code=404, detail="Asset not found")
 
     job_id = str(uuid.uuid4())[:8].upper()
     create_job(job_id)

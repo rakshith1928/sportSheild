@@ -1,7 +1,10 @@
 from fastapi import APIRouter, HTTPException, Request, Depends, Body
 from fastapi.responses import JSONResponse
+import logging
 from services.rag_engine import explain_violation, query_rag
 from dependencies import limiter, get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -52,9 +55,10 @@ async def explain_violation_endpoint(violation: dict, request: Request, user = D
         )
 
     except Exception as e:
+        logger.error(f"Explanation failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Explanation failed: {str(e)}"
+            detail="Explanation failed. Please try again."
         )
 
 
@@ -111,10 +115,11 @@ async def explain_batch(request: Request, violations: list = Body(...), user = D
                 "recommended_action": result["recommended_action"]
             })
         except Exception as e:
+            logger.error(f"Batch explanation item {i} failed: {e}")
             errors.append({
                 "index": i,
                 "url": violation.get("page_url", "unknown"),
-                "error": str(e)
+                "error": type(e).__name__
             })
 
     # Sort by confidence descending

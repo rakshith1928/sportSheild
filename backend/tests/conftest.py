@@ -52,6 +52,9 @@ class FakeStorageBucket:
         self._recorder = recorder
 
     def upload(self, path, file, file_options=None):
+        fail = self._recorder.get("fail_upload")
+        if fail is not None:
+            raise fail
         self._recorder["uploads"].append(
             {"path": path, "size": len(file), "options": file_options}
         )

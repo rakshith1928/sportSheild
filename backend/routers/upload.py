@@ -82,13 +82,24 @@ async def upload_asset(
             image = Image.open(io.BytesIO(content)).convert("RGB")
             duplicates = compare_image_to_db(image)
             if duplicates:
+                # Redact stored metadata: the caller only needs to know THAT
+                # a match exists, not other users' owner/description/file_url.
+                redacted_matches = [
+                    {
+                        "asset_id": m.get("asset_id"),
+                        "clip_similarity": m.get("clip_similarity"),
+                        "phash_distance": m.get("phash_distance"),
+                        "is_likely_copy": m.get("is_likely_copy"),
+                    }
+                    for m in duplicates
+                ]
                 return JSONResponse(
                     status_code=409,
                     content={
                         "success": False,
                         "duplicate": True,
                         "message": "This asset is already protected!",
-                        "matches": duplicates
+                        "matches": redacted_matches
                     }
                 )
         except Exception as e:
@@ -121,9 +132,10 @@ async def upload_asset(
             )
             file_url = supabase.storage.from_("assets").get_public_url(filename)
         except Exception as e:
+            logger.error(f"Supabase Storage upload failed for {filename}: {e}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Supabase Storage upload failed: {str(e)}"
+                detail="Storage upload failed. Please try again."
             )
 
         # Step 6 — Build metadata
@@ -182,9 +194,10 @@ async def upload_asset(
             raise
         except Exception as e:
             _delete_storage_object(supabase, filename)
+            logger.error(f"Fingerprinting failed for {asset_id}: {e}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Fingerprinting failed: {str(e)}"
+                detail="Processing failed. Please try again."
             )
     finally:
         # Cleanup the temporary directory (file included) on every path
@@ -196,7 +209,8 @@ async def list_assets(limit: int = 50, offset: int = 0, user = Depends(get_curre
     try:
         return db_get_assets(user_id=user.id, limit=limit, offset=offset)
     except Exception as e:
+        logger.error(f"List assets failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to list assets: {str(e)}"
+            detail="Could not list assets. Please try again."
         )

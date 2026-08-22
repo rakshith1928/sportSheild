@@ -33,9 +33,10 @@ async def scan_asset(asset_id: str, request: Request, user = Depends(get_current
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Asset lookup failed for {asset_id}: {e}")
         raise HTTPException(
             status_code=404,
-            detail=f"Asset not found: {str(e)}"
+            detail=f"Asset {asset_id} not found"
         )
 
     # Create scan record in Supabase
@@ -57,14 +58,15 @@ async def scan_asset(asset_id: str, request: Request, user = Depends(get_current
 
     # Handle scan error
     if "error" in scan_result:
+        logger.error(f"Scan failed for asset {asset_id}: {scan_result['error']}")
         update_scan_status(
             scan_id=scan_id,
             status="failed",
-            errors=[scan_result["error"]],
+            errors=["Scan failed"],
         )
         raise HTTPException(
             status_code=500,
-            detail=scan_result["error"]
+            detail="Scan failed. Please try again."
         )
 
     # Store violations in Supabase (with dedup)

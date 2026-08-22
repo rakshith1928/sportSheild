@@ -151,8 +151,11 @@ async def scan_google_for_asset(
                 })
 
     except Exception as e:
+        # Full detail goes to server logs only; the dict may be persisted
+        # via update_scan_status and later served to clients.
+        logger.error(f"Scan failed for asset {asset_id}: {e}")
         return {
-            "error": f"Scan failed: {str(e)}",
+            "error": "Scan failed",
             "asset_id": asset_id
         }
 
