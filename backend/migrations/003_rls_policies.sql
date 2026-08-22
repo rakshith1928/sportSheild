@@ -24,24 +24,24 @@ alter table reports    enable row level security;
 
 create policy "users read own assets"
   on assets for select to authenticated
-  using (owner = auth.uid());
+  using (owner::text = auth.uid()::text);
 
 create policy "users read scans of own assets"
   on scans for select to authenticated
   using (exists (
-    select 1 from assets a where a.asset_id = scans.asset_id and a.owner = auth.uid()
+    select 1 from assets a where a.asset_id::text = scans.asset_id::text and a.owner = auth.uid()
   ));
 
 create policy "users read violations of own assets"
   on violations for select to authenticated
   using (exists (
-    select 1 from assets a where a.asset_id = violations.asset_id and a.owner = auth.uid()
+    select 1 from assets a where a.asset_id::text = violations.asset_id::text and a.owner = auth.uid()
   ));
 
 create policy "users read reports of own assets"
   on reports for select to authenticated
   using (exists (
-    select 1 from assets a where a.asset_id = reports.asset_id and a.owner = auth.uid()
+    select 1 from assets a where a.asset_id::text = reports.asset_id::text and a.owner = auth.uid()
   ));
 
 -- ─────────────────────────────────────────────────────────────

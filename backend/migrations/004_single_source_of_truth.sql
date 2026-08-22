@@ -9,7 +9,9 @@
 
 -- 1. Remove orphaned embeddings (no matching assets row — legacy half-writes)
 delete from asset_embeddings e
-where not exists (select 1 from assets a where a.asset_id = e.id);
+where not exists (
+  select 1 from assets a where a.asset_id::text = e.id::text
+);
 
 -- 2. match_assets now joins to assets so similarity search returns the
 --    authoritative phash (and can never return an orphaned embedding).
