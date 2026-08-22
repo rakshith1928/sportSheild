@@ -33,7 +33,12 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting SportShield AI...")
     logger.info("Loading CLIP model...")
-    init_clip_model()
+    try:
+        init_clip_model()
+    except Exception as e:
+        # Fingerprinting will return per-request errors, but the app starts
+        # and every other flow (scan history, reports, dashboard) works.
+        logger.warning(f"CLIP model failed to load — uploads will error until fixed: {e}")
     logger.info("Initializing RAG knowledge base...")
     try:
         init_rag()

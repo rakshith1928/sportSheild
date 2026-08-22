@@ -4,7 +4,6 @@ import numpy as np
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
 from transformers import CLIPProcessor, CLIPModel
 import torch
 import cv2
@@ -73,21 +72,8 @@ def fingerprint_image(image_path: str, metadata: dict) -> dict:
     phash = get_phash(image)
     clip_embedding = get_clip_embedding(image)
 
-    full_metadata = {
-        **metadata,
-        "phash": phash,
-        "asset_id": asset_id,
-        "fingerprinted_at": datetime.now(timezone.utc).isoformat(),
-        "type": "image",
-    }
-
     # Store in Supabase pgvector
-    vector_store.upsert_asset_embedding(
-        asset_id=asset_id,
-        embedding=clip_embedding,
-        metadata=full_metadata,
-        document=f"Sports asset: {metadata.get('description', '')}",
-    )
+    vector_store.upsert_asset_embedding(asset_id=asset_id, embedding=clip_embedding)
 
     total = vector_store.count_assets()
 
@@ -170,24 +156,10 @@ def fingerprint_video(video_path: str, metadata: dict) -> dict:
         logger.warning("⚠️ CLIP embedding failed or model not initialized — storing empty embedding.")
         clip_embedding = []
 
-    # NOTE: the local file path is intentionally NOT persisted here — it is a
-    # temporary file that is deleted right after fingerprinting.
-    full_metadata = {
-        **metadata,
-        "phash": phash,
-        "asset_id": asset_id,
-        "fingerprinted_at": datetime.now(timezone.utc).isoformat(),
-        "type": "video",
-        "frame_count": len(frames),
-    }
-
+    # NOTE: the local file path is intentionally NOT persisted anywhere — it
+    # is a temporary file that is deleted right after fingerprinting.
     # Store in Supabase pgvector
-    vector_store.upsert_asset_embedding(
-        asset_id=asset_id,
-        embedding=clip_embedding,
-        metadata=full_metadata,
-        document=f"Sports video: {metadata.get('description', '')}",
-    )
+    vector_store.upsert_asset_embedding(asset_id=asset_id, embedding=clip_embedding)
 
     total = vector_store.count_assets()
 
@@ -238,22 +210,16 @@ def compare_image_to_db(image: Image.Image, threshold: float | None = None) -> l
     matches = []
     for row in raw_matches:
         similarity = float(row.get("similarity", 0))
-        metadata = row.get("metadata") or {}
+        phash_hex = row.get("phash") or "0" * 16
 
-        stored_phash = imagehash.hex_to_hash(metadata.get("phash", "0" * 16))
+        stored_phash = imagehash.hex_to_hash(phash_hex)
         phash_distance = query_phash - stored_phash
 
         matches.append({
-            "asset_id": metadata.get("asset_id"),
+            "asset_id": row.get("id"),
             "clip_similarity": round(similarity, 4),
             "phash_distance": phash_distance,
             "is_likely_copy": phash_distance < 10 or similarity > 0.92,
-            "metadata": metadata,
         })
 
     return sorted(matches, key=lambda x: x["clip_similarity"], reverse=True)
-
-
-def get_all_assets() -> list:
-    """Get all stored assets from pgvector"""
-    return vector_store.get_all_assets()

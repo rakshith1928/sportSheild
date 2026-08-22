@@ -52,6 +52,5 @@ def test_pgvector_metadata_holds_no_local_file_paths(client, fake_vector_store):
         data={"sport": "basketball", "team": "lakers"},
     )
     assert resp.status_code == 200, resp.text
-    stored_meta = fake_vector_store[0]["metadata"]
-    for key in ("image_path", "file_path", "temp_dir"):
-        assert key not in stored_meta
+    # Embeddings hold only the fingerprint — never metadata, never paths
+    assert set(fake_vector_store[0].keys()) == {"asset_id", "embedding"}

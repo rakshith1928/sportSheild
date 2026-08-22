@@ -120,10 +120,8 @@ def fake_vector_store(monkeypatch):
     """Record pgvector upserts; pretend one asset already exists."""
     upserts = []
 
-    def fake_upsert(asset_id, embedding, metadata, document=""):
-        upserts.append(
-            {"asset_id": asset_id, "embedding": embedding, "metadata": metadata}
-        )
+    def fake_upsert(asset_id, embedding):
+        upserts.append({"asset_id": asset_id, "embedding": embedding})
 
     monkeypatch.setattr(vector_store, "upsert_asset_embedding", fake_upsert)
     monkeypatch.setattr(vector_store, "count_assets", lambda: 1)

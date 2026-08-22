@@ -4,7 +4,7 @@ Handles all PostgreSQL operations and metadata persistence.
 """
 import os
 from datetime import datetime, timezone
-from typing import cast, Any
+from typing import cast
 from supabase import create_client, Client
 from postgrest import CountMethod
 _supabase_client: Client | None = None
@@ -22,6 +22,26 @@ def get_supabase_client() -> Client:
     return _supabase_client
 
 # ─── Assets ───────────────────────────────────────────────
+
+def get_asset_by_id(asset_id: str) -> dict | None:
+    """Fetch one asset's authoritative row from the assets table.
+
+    Returns None when the asset does not exist or cannot be read;
+    ownership checks are applied by callers."""
+    client = get_supabase_client()
+    try:
+        resp = (
+            client.table("assets")
+            .select("*")
+            .eq("asset_id", asset_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        return None
+    return resp.data if resp and resp.data else None
+
+
 def insert_asset(metadata: dict) -> dict:
     """Store asset metadata in Supabase after fingerprinting."""
     client = get_supabase_client()

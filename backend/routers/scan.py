@@ -6,7 +6,7 @@ from services.database import (
     get_violations, check_violation_exists,
     get_scan_history, get_scan_by_id, get_recent_alerts
 )
-from services.vector_store import get_asset_by_id
+from services.database import get_asset_by_id
 import asyncio
 import logging
 from dependencies import get_current_user, limiter

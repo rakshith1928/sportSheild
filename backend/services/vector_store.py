@@ -77,10 +77,9 @@ $$;
 
 from __future__ import annotations
 import logging
-import os
 from typing import Any, cast
 from postgrest import CountMethod
-from supabase import create_client, Client
+from supabase import Client
 
 logger = logging.getLogger(__name__)
 
@@ -103,19 +102,16 @@ def _get_client() -> Client:
 # Asset Embeddings (CLIP 512-dim)
 # ---------------------------------------------------------------------------
 
-def upsert_asset_embedding(
-    asset_id: str,
-    embedding: list[float],
-    metadata: dict[str, Any],
-    document: str = "",
-) -> None:
-    """Store or update a CLIP embedding for a protected asset."""
+def upsert_asset_embedding(asset_id: str, embedding: list[float]) -> None:
+    """Store or update a CLIP embedding for a protected asset.
+
+    The `assets` table is the single source of truth for metadata; this
+    table holds only (id, embedding, created_at). See
+    migrations/004_single_source_of_truth.sql."""
     client = _get_client()
     client.table("asset_embeddings").upsert({
         "id": asset_id,
         "embedding": embedding,
-        "metadata": metadata,
-        "document": document,
     }).execute()
     logger.debug(f"📌 Upserted embedding for asset {asset_id}")
 
@@ -135,7 +131,7 @@ def query_assets(
 ) -> list[dict[str, Any]]:
     """
     Find the closest assets using cosine similarity via the match_assets RPC.
-    Returns list of dicts with: id, metadata, similarity.
+    Returns list of dicts with: id, phash, similarity (joined from assets).
     """
     client = _get_client()
     try:
@@ -154,30 +150,6 @@ def query_assets(
     except Exception as e:
         logger.error(f"query_assets RPC failed: {e}")
         return []
-
-
-def get_asset_by_id(asset_id: str) -> dict[str, Any] | None:
-    """Retrieve a single asset's metadata by its ID."""
-    client = _get_client()
-    resp = client.table("asset_embeddings").select("id,metadata").eq("id", asset_id).limit(1).execute()
-    rows = resp.data
-    if not isinstance(rows, list) or len(rows) == 0:
-        return None
-    row = cast(dict[str, Any], rows[0])
-    return {**(row.get("metadata") or {}), "asset_id": row["id"]}
-
-
-def get_all_assets() -> list[dict[str, Any]]:
-    """Return metadata for every stored asset."""
-    client = _get_client()
-    resp = client.table("asset_embeddings").select("id,metadata").execute()
-    rows = resp.data
-    if not isinstance(rows, list):
-        return []
-    return [
-        {**(cast(dict[str, Any], row).get("metadata") or {}), "asset_id": cast(dict[str, Any], row)["id"]}
-        for row in rows
-    ]
 
 
 def count_assets() -> int:

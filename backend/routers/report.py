@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from services.report_generator import generate_report
 from services.rag_engine import explain_violation
 from services.database import insert_report as db_insert_report, get_reports as db_get_reports, get_report_by_id
-from services.vector_store import get_asset_by_id
+from services.database import get_asset_by_id
 from services.job_store import create_job, update_job, get_job
 from dependencies import get_current_user
 from typing import cast

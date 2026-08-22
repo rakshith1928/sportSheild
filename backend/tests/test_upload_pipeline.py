@@ -81,7 +81,7 @@ def test_successful_image_upload(
     # Embedding persisted to pgvector
     assert len(fake_vector_store) == 1
     assert fake_vector_store[0]["asset_id"] == body["asset_id"]
-    assert fake_vector_store[0]["metadata"]["type"] == "image"
+    assert set(fake_vector_store[0].keys()) == {"asset_id", "embedding"}
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ def test_successful_video_upload_and_fingerprinting(
     assert fake_vector_store[0]["embedding"] == pytest.approx(
         [1.0 / (8 ** 0.5)] * 8
     )
-    assert fake_vector_store[0]["metadata"]["type"] == "video"
+    assert set(fake_vector_store[0].keys()) == {"asset_id", "embedding"}
 
     assert fake_supabase["uploads"][0]["path"] == body["filename"]
     assert fake_supabase["removes"] == []
