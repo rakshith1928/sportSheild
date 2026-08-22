@@ -41,3 +41,17 @@ def test_metadata_insert_failure_cleans_embedding_and_storage(
     # And nothing pretends success
     body = resp.json()
     assert body.get("success") is not True
+
+
+def test_pgvector_metadata_holds_no_local_file_paths(client, fake_vector_store):
+    """The temp file path is ephemeral (deleted right after upload); persisting
+    it in pgvector metadata leaves a forever-stale pointer."""
+    resp = client.post(
+        "/upload/asset",
+        files={"file": ("poster.png", io.BytesIO(make_png_bytes()), "image/png")},
+        data={"sport": "basketball", "team": "lakers"},
+    )
+    assert resp.status_code == 200, resp.text
+    stored_meta = fake_vector_store[0]["metadata"]
+    for key in ("image_path", "file_path", "temp_dir"):
+        assert key not in stored_meta

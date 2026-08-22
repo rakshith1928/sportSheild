@@ -77,7 +77,6 @@ def fingerprint_image(image_path: str, metadata: dict) -> dict:
         **metadata,
         "phash": phash,
         "asset_id": asset_id,
-        "image_path": image_path,
         "fingerprinted_at": datetime.now(timezone.utc).isoformat(),
         "type": "image",
     }
