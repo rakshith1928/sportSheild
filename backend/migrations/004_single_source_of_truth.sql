@@ -13,6 +13,10 @@ where not exists (select 1 from assets a where a.asset_id = e.id);
 
 -- 2. match_assets now joins to assets so similarity search returns the
 --    authoritative phash (and can never return an orphaned embedding).
+--    The return type changes (metadata -> phash), so the old signature
+--    must be dropped first — CREATE OR REPLACE cannot change OUT params.
+drop function if exists match_assets(vector, integer, double precision);
+
 create or replace function match_assets(
   query_embedding vector(512),
   match_count int,
