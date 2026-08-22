@@ -74,8 +74,12 @@ async def scan_asset(asset_id: str, request: Request, user = Depends(get_current
     stored_count = 0
     for violation in new_violations:
         if not check_violation_exists(violation["image_url"]):
-            insert_violation(violation, scan_id=scan_id)
-            stored_count += 1
+            try:
+                insert_violation(violation, scan_id=scan_id)
+                stored_count += 1
+            except Exception as e:
+                # Non-fatal: one bad row must not fail an entire completed scan.
+                logger.error(f"Failed to store violation {violation.get('image_url')}: {e}")
 
     # Update scan record with results
     update_scan_status(

@@ -164,6 +164,24 @@ def get_scan_by_id(scan_id: str) -> dict | None:
     return cast(dict | None, result.data)
 
 # ─── Violations ────────────────────────────────────────────
+def severity_from_similarity(clip_similarity) -> str:
+    """The single shared severity model for violations.
+
+    Used when persisting violations (enables the dashboard's high/
+    medium/low filter), when formatting recent alerts, and by any
+    consumer that needs to classify a similarity score. Thresholds:
+    > 0.9 high, > 0.75 medium, else low.
+    """
+    try:
+        sim = float(clip_similarity) if clip_similarity is not None else 0.0
+    except (TypeError, ValueError):
+        return "low"
+    if sim > 0.9:
+        return "high"
+    if sim > 0.75:
+        return "medium"
+    return "low"
+
 def insert_violation(violation_data: dict, scan_id: str | None = None) -> dict:
     """Store a detected violation."""
     client = get_supabase_client()
@@ -176,6 +194,7 @@ def insert_violation(violation_data: dict, scan_id: str | None = None) -> dict:
         "clip_similarity": violation_data["clip_similarity"],
         "phash_distance": violation_data.get("phash_distance"),
         "is_likely_copy": violation_data.get("is_likely_copy", False),
+        "severity": severity_from_similarity(violation_data.get("clip_similarity")),
         "detected_at": violation_data.get("detected_at",
                                           datetime.now(timezone.utc).isoformat()),
     }
@@ -234,10 +253,8 @@ def get_recent_alerts(user_id: str, limit: int = 5) -> list[dict]:
         if not isinstance(row, dict):
             continue
             
-        # Determine severity based on similarity score
-        sim_val = row.get("clip_similarity", 0)
-        sim = float(cast(Any, sim_val)) if sim_val is not None else 0.0
-        severity = "high" if sim > 0.9 else "medium" if sim > 0.75 else "low"
+        # Shared severity model (same thresholds persisted at insert time)
+        severity = severity_from_similarity(row.get("clip_similarity", 0))
         
         # Format the date (we will send the ISO string and let frontend format it if needed, or simple mock)
         alerts.append({

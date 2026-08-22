@@ -207,6 +207,7 @@ class FakeQuery:
                 "filters": list(self.filters),
                 "range": self.range_args,
                 "single_mode": self.single_mode,
+                "insert": self._pending_row,
             }
         )
         rows = list(self.recorder["rows"].get(self.table, []))
