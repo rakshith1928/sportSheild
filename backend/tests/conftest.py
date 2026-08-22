@@ -61,7 +61,29 @@ class FakeStorageBucket:
         return {"Id": path}
 
     def get_public_url(self, path):
+        self._recorder["public_urls"].append(path)
         return f"https://fake.supabase.co/storage/v1/object/public/assets/{path}"
+
+    def create_signed_url(self, path, expires_in, options=None):
+        self._recorder["signed_urls"].append(
+            {"path": path, "expires_in": expires_in}
+        )
+        url = f"https://fake.supabase.co/object/sign/assets/{path}?token=fake-signature"
+        return {"signedURL": url, "signedUrl": url}
+
+    def create_signed_urls(self, paths, expires_in, options=None):
+        self._recorder["signed_urls"].extend(
+            {"path": p, "expires_in": expires_in} for p in paths
+        )
+        return [
+            {
+                "error": None,
+                "path": p,
+                "signedURL": f"https://fake.supabase.co/object/sign/assets/{p}?token=fake-signature",
+                "signedUrl": f"https://fake.supabase.co/object/sign/assets/{p}?token=fake-signature",
+            }
+            for p in paths
+        ]
 
     def remove(self, paths):
         removed = list(paths)
@@ -86,7 +108,7 @@ class FakeSupabase:
 @pytest.fixture(autouse=True)
 def fake_supabase(monkeypatch):
     """Record Supabase Storage interactions instead of hitting the network."""
-    recorder = {"uploads": [], "removes": [], "bucket": None}
+    recorder = {"uploads": [], "removes": [], "bucket": None, "public_urls": [], "signed_urls": []}
     monkeypatch.setattr(
         upload_mod, "get_supabase_client", lambda: FakeSupabase(recorder)
     )

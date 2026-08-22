@@ -57,9 +57,9 @@ def test_successful_image_upload(
     assert body["asset_id"]
     assert body["filename"].startswith(body["asset_id"])
     assert body["filename"].endswith(".png")
-    assert body["file_url"] == (
-        f"https://fake.supabase.co/storage/v1/object/public/assets/{body['filename']}"
-    )
+    # Private bucket: clients get short-lived signed URLs, never public ones
+    assert "/object/public/" not in body["file_url"]
+    assert "token=fake-signature" in body["file_url"]
 
     fp = body["fingerprint"]
     assert PHASH_RE.match(fp["phash"])
@@ -76,7 +76,7 @@ def test_successful_image_upload(
     row = fake_db_insert[0]
     assert row["owner"] == "test-user-123"
     assert row["phash"] == fp["phash"]
-    assert row["file_url"] == body["file_url"]
+    assert row["file_url"] == body["filename"]  # storage path, not a URL
 
     # Embedding persisted to pgvector
     assert len(fake_vector_store) == 1

@@ -45,6 +45,63 @@ def _delete_storage_object(supabase, filename: str) -> None:
         logger.error(f"Failed to delete orphaned storage object {filename}: {cleanup_err}")
 
 
+# Signed URLs handed to clients live for 1 hour. The 'assets' bucket is
+# PRIVATE (see backend/migrations/002_storage_private.sql): user media must
+# never be exposed via public /object/public/ URLs.
+SIGNED_URL_EXPIRY_SECONDS = 3600
+
+
+def _signed_url(supabase, path: str) -> str | None:
+    """Create a short-lived signed URL for one storage object."""
+    try:
+        result = supabase.storage.from_("assets").create_signed_url(
+            path, SIGNED_URL_EXPIRY_SECONDS
+        )
+        return result.get("signedURL") or result.get("signedUrl")
+    except Exception as e:
+        logger.error(f"Failed to sign URL for {path}: {e}")
+        return None
+
+
+def _attach_signed_urls(supabase, rows: list[dict]) -> list[dict]:
+    """Replace stored storage-paths in `file_url` with signed URLs, batched.
+
+    Legacy rows may hold absolute public URLs; their object path is parsed
+    back out so they get re-signed too. Failures leave the original value.
+    """
+    paths = [r.get("file_url") for r in rows if r.get("file_url")]
+    if not paths:
+        return rows
+    try:
+        signed = supabase.storage.from_("assets").create_signed_urls(
+            paths, SIGNED_URL_EXPIRY_SECONDS
+        )
+    except Exception as e:
+        logger.error(f"Batch URL signing failed: {e}")
+        return rows
+    by_path = {
+        item.get("path"): (item.get("signedURL") or item.get("signedUrl"))
+        for item in signed or []
+        if not item.get("error")
+    }
+    out = []
+    for row in rows:
+        row = dict(row)
+        url = row.get("file_url")
+        if url and url in by_path and by_path[url]:
+            row["file_url"] = by_path[url]
+        elif url and url.startswith("http"):
+            # Legacy public URL — extract the object path and sign it singly.
+            marker = "/object/public/assets/"
+            if marker in url:
+                path = url.split(marker, 1)[1]
+                signed_single = _signed_url(supabase, path)
+                if signed_single:
+                    row["file_url"] = signed_single
+        out.append(row)
+    return out
+
+
 STREAM_CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
@@ -161,7 +218,9 @@ async def upload_asset(
                 file=content,
                 file_options={"content-type": file.content_type}  # type: ignore
             )
-            file_url = supabase.storage.from_("assets").get_public_url(filename)
+            # Persist the storage PATH only; clients get short-lived signed
+            # URLs generated at read time (the bucket is private).
+            file_url = filename
         except Exception as e:
             logger.error(f"Supabase Storage upload failed for {filename}: {e}")
             raise HTTPException(
@@ -209,14 +268,14 @@ async def upload_asset(
             except Exception as db_err:
                 logger.warning(f"Supabase DB insert failed (non-fatal): {db_err}")
 
-            # Success
+            # Success — hand the uploader a previewable signed URL
             return JSONResponse(
                 status_code=200,
                 content={
                     "success": True,
                     "asset_id": asset_id,
                     "filename": filename,
-                    "file_url": file_url,
+                    "file_url": _signed_url(supabase, file_url),
                     "fingerprint": result,
                     "message": "Asset fingerprinted, stored in cloud, and protected!"
                 }
@@ -240,7 +299,13 @@ async def upload_asset(
 async def list_assets(limit: int = 50, offset: int = 0, user = Depends(get_current_user)):
     """List protected assets for the logged-in user with pagination"""
     try:
-        return db_get_assets(user_id=user.id, limit=limit, offset=offset)
+        result = db_get_assets(user_id=user.id, limit=limit, offset=offset)
+        # The bucket is private: swap stored storage-paths for short-lived
+        # signed URLs before anything reaches the client.
+        supabase = get_supabase_client()
+        result = dict(result)
+        result["assets"] = _attach_signed_urls(supabase, result.get("assets", []))
+        return result
     except Exception as e:
         logger.error(f"List assets failed: {e}")
         raise HTTPException(
