@@ -88,11 +88,14 @@ _supabase: Client | None = None
 
 
 def _get_client() -> Client:
+    """Shared Supabase client — delegates to services.database's singleton
+    (looked up dynamically so test patches of database.get_supabase_client
+    take effect)."""
     global _supabase
     if _supabase is None:
-        url = os.environ["SUPABASE_URL"]
-        key = os.environ["SUPABASE_SERVICE_KEY"]
-        _supabase = create_client(url, key)
+        from services import database
+
+        _supabase = database.get_supabase_client()
     return _supabase
 
 

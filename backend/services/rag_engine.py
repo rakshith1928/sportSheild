@@ -7,7 +7,6 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 from groq import Groq
 from typing import Any
-from supabase import create_client
 from services.vector_store import count_rag_documents
 
 logger = logging.getLogger(__name__)
@@ -18,6 +17,16 @@ embeddings = None
 groq_client = None
 
 KNOWLEDGE_BASE_PATH = Path("knowledge_base/ip_laws")
+
+
+def _supabase_for_rag():
+    """Shared Supabase client for the RAG vector store. Delegates to the
+    canonical services.database singleton (dynamic lookup so tests can
+    patch it); raises RuntimeError with a clear message if env vars are
+    missing instead of an unhandled KeyError."""
+    from services import database
+
+    return database.get_supabase_client()
 
 
 def init_rag():
@@ -39,11 +48,7 @@ def init_rag():
         model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     )
 
-    # Connect to Supabase pgvector for RAG knowledge base
-    supabase_client = create_client(
-        os.environ["SUPABASE_URL"],
-        os.environ["SUPABASE_SERVICE_KEY"],
-    )
+    supabase_client = _supabase_for_rag()
     rag_vectorstore = SupabaseVectorStore(
         client=supabase_client,
         embedding=embeddings,

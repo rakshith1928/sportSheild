@@ -55,3 +55,25 @@ def test_cors_allows_localhost_3000(cors_client):
 def test_cors_rejects_lookalike_domain(cors_client):
     r = cors_client.get("/health", headers={"Origin": "https://vercel.app.evil.com"})
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_supabase_client_singletons_delegate_to_database(monkeypatch):
+    """vector_store and rag_engine must use the shared services.database
+    singleton — three independent clients meant three env-validation styles
+    (RuntimeError vs KeyError) and three connection pools."""
+    import services.database as database_mod
+    import services.vector_store as vector_store
+    import services.rag_engine as rag_engine
+
+    sentinel = object()
+    calls = []
+
+    def fake_get_client():
+        calls.append(1)
+        return sentinel
+
+    monkeypatch.setattr(database_mod, "get_supabase_client", fake_get_client)
+    monkeypatch.setattr(vector_store, "_supabase", None)
+
+    assert vector_store._get_client() is sentinel
+    assert rag_engine._supabase_for_rag() is sentinel

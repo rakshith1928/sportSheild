@@ -35,7 +35,12 @@ async def lifespan(app: FastAPI):
     logger.info("Loading CLIP model...")
     init_clip_model()
     logger.info("Initializing RAG knowledge base...")
-    init_rag()
+    try:
+        init_rag()
+    except Exception as e:
+        # RAG is an enhancement (legal explanations); the core
+        # fingerprint/scan/report flows work without it.
+        logger.warning(f"RAG initialization failed — explanations will use fallbacks: {e}")
     logger.info("Connecting to Supabase...")
     try:
         get_supabase_client()
