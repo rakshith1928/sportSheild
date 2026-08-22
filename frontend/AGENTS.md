@@ -12,10 +12,10 @@ Dark-themed sports piracy protection dashboard with AI fingerprinting capabiliti
 ## Build & Development Commands
 
 ```bash
-pnpm dev          # Start dev server (localhost:3000)
-pnpm build        # Production build
-pnpm start        # Start production server
-pnpm lint         # Run ESLint
+npm run dev          # Start dev server (localhost:3000)
+npm run build        # Production build
+npm start        # Start production server
+npm run lint         # Run ESLint
 ```
 
 **No test framework configured yet.** Project uses manual testing via dashboard UI.
@@ -129,7 +129,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 ## Testing (Manual)
 
-1. Run `pnpm dev`
+1. Run `npm run dev`
 2. Navigate to affected page
 3. Verify UI matches Figma design tokens
 4. Check console for errors

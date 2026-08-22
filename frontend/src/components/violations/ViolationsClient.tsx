@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { ViolationDetails } from '@/utils/api'
+import type { ViolationDetails } from '@/utils/api'
 import { ViolationDrawer } from './ViolationDrawer'
 import { PaginationControls } from '@/components/common/PaginationControls'
 

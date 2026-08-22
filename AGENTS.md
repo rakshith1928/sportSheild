@@ -4,7 +4,7 @@
 
 This is a monorepo for a sports media digital-asset protection tool. It has a **FastAPI-based Python backend** and a **Next.js + React-based web frontend**, connected via a REST API.
 
-- **Backend:** `backend/` — FastAPI, ChromaDB, CLIP, pHash, Groq, Supabase.
+- **Backend:** `backend/` — FastAPI, Supabase (pgvector), CLIP, pHash, Groq.
 - **Frontend:** `frontend/` — Next.js 16 (App Router), React 19, Tailwind CSS v4, Supabase Auth.
 
 ## Architecture
@@ -36,11 +36,11 @@ uvicorn main:app --reload --port 8000
 
 **Frontend (inside `frontend/`):**
 ```bash
-# Use pnpm (lockfile exists)
-pnpm install
-pnpm dev        # localhost:3000
-pnpm build      # Production build
-pnpm lint       # ESLint
+# Use npm (package-lock.json is committed)
+npm install
+npm run dev     # localhost:3000
+npm run build   # Production build
+npm run lint    # ESLint
 ```
 
 > **Note:** No test suite is currently configured. Testing is done manually.

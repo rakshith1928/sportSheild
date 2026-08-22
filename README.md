@@ -28,12 +28,12 @@ SportShield AI protects sports media organizations from copyright theft at scale
 |---|---|
 | **Image Fingerprinting** | pHash + CLIP (`openai/clip-vit-base-patch32`) |
 | **Video Fingerprinting** | CLIP frame sampling |
-| **Vector Search** | ChromaDB |
+| **Vector Search** | Supabase pgvector (CLIP 512-dim + MiniLM 384-dim) |
 | **Web Scanning** | Google Custom Search API |
-| **RAG Knowledge Base** | LangChain + ChromaDB |
+| **RAG Knowledge Base** | LangChain + Supabase pgvector |
 | **LLM Explanations** | Groq (`llama-3.3-70b-versatile`, configurable via `GROQ_MODEL`) |
 | **Backend** | FastAPI + Python |
-| **Frontend** | Next.js 15 (App Router) + Tailwind CSS v4 |
+| **Frontend** | Next.js 16 (App Router) + Tailwind CSS v4 |
 | **Auth** | Supabase Auth (SSR) |
 | **Database** | Supabase (PostgreSQL) |
 | **Storage** | Supabase Storage (Phase 5) |
@@ -137,7 +137,6 @@ GOOGLE_API_KEY=your_google_api_key
 GOOGLE_CSE_ID=your_custom_search_engine_id
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
-CHROMA_DB_PATH=./chroma_db
 UPLOAD_DIR=./uploads
 ```
 

@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
-import { ReportMeta, ViolationDetails, generateReport, getAssetViolations, getReports, getReportJobStatus } from '@/utils/api'
+import type { ReportMeta, ViolationDetails } from '@/utils/api'
+import { generateReport, getAssetViolations, getReports, getReportJobStatus } from '@/utils/api-client'
 import { Asset } from './types'
 import { SeverityPill, CompileStep } from './ReportHelpers'
 

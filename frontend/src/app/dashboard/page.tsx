@@ -141,44 +141,6 @@ export default async function DashboardPage() {
         </a>
       </div>
 
-      {/* Design System Showcase — from Figma */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Actions & Controls */}
-        <div className="rounded-xl p-6 bg-[#111415] border border-white/5">
-          <h4 className="text-lg font-semibold text-white mb-4">Actions & Controls</h4>
-          <div className="space-y-3">
-            <button className="w-full px-4 py-3 rounded-lg font-medium text-white text-sm transition-colors hover:opacity-90" style={{ backgroundColor: 'var(--accent-coral)', borderRadius: 'var(--radius-button)' }}>
-              Issue Takedown Notice
-            </button>
-            <button className="w-full px-4 py-3 rounded-lg font-medium text-white text-sm transition-colors hover:opacity-90" style={{ backgroundColor: 'var(--primary-base)', borderRadius: 'var(--radius-button)' }}>
-              Start Investigation
-            </button>
-            <button className="w-full px-4 py-3 rounded-lg font-medium text-sm transition-colors" style={{ backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--surface-white)', borderRadius: 'var(--radius-button)' }}>
-              Export Report
-            </button>
-          </div>
-        </div>
-
-        {/* Threat Classification */}
-        <div className="rounded-xl p-6 bg-[#111415] border border-white/5">
-          <h4 className="text-lg font-semibold text-white mb-4">Threat Classification</h4>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Critical violations</span>
-              <SeverityBadge level="high" />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Moderate risk</span>
-              <SeverityBadge level="medium" />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Minor incidents</span>
-              <SeverityBadge level="low" />
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div>
   )
 }

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { ViolationDetails, ExplainResponse, explainViolation } from '@/utils/api'
+import type { ViolationDetails, ExplainResponse } from '@/utils/api'
+import { explainViolation } from '@/utils/api-client'
 
 interface Props {
   violation: ViolationDetails | null

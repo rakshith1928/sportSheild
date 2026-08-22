@@ -24,6 +24,6 @@ We will acknowledge your report within **48 hours** and aim to release a patch w
 ## Security Best Practices for Contributors
 
 - Never commit `.env`, `.env.local`, or any file containing API keys
-- All Supabase Row Level Security (RLS) policies must be reviewed before merging
-- FastAPI routes that expose user data must have JWT verification (`Depends(verify_jwt)`)
+- Supabase access uses the service-role key server-side (RLS bypassed by design); tenant isolation is enforced at the API layer via ownership checks. Schema lives in backend/migrations/
+- FastAPI routes that expose user data must require auth (`Depends(get_current_user)`) and scope queries by asset owner
 - All file uploads must validate content type AND file size before processing
