@@ -117,6 +117,14 @@ def upsert_asset_embedding(
     logger.debug(f"📌 Upserted embedding for asset {asset_id}")
 
 
+def delete_asset_embedding(asset_id: str) -> None:
+    """Remove an asset's CLIP embedding (used when its metadata row fails
+    to write, so pgvector never holds assets invisible to the app)."""
+    client = _get_client()
+    client.table("asset_embeddings").delete().eq("id", asset_id).execute()
+    logger.debug(f"🗑 Deleted embedding for asset {asset_id}")
+
+
 def query_assets(
     query_embedding: list[float],
     n_results: int = 10,

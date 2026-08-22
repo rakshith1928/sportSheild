@@ -15,6 +15,7 @@ from services.fingerprint import (
     compare_image_to_db
 )
 from services.database import insert_asset as db_insert_asset, get_assets as db_get_assets, get_supabase_client
+from services.vector_store import delete_asset_embedding
 from dependencies import get_current_user, limiter
 from fastapi import Depends
 
@@ -260,13 +261,31 @@ async def upload_asset(
                     detail=f"{kind} error: {result['error']}"
                 )
 
-            # Step 8 — Dual-write to Supabase DB
+            # Step 8 — Dual-write to Supabase DB. The metadata row is what
+            # makes an asset visible, ownable, and scoppable; if it fails we
+            # must NOT keep the pgvector embedding or storage object —
+            # otherwise an unmanageable orphan participates in duplicate
+            # checks while no dashboard can ever see or delete it.
             metadata["file_url"] = file_url
             metadata["phash"] = result.get("phash")
             try:
                 db_insert_asset(metadata)
             except Exception as db_err:
-                logger.warning(f"Supabase DB insert failed (non-fatal): {db_err}")
+                logger.error(
+                    f"Asset metadata insert failed for {asset_id}, "
+                    f"compensating: {db_err}"
+                )
+                try:
+                    delete_asset_embedding(asset_id)
+                except Exception as del_err:
+                    logger.error(
+                        f"Failed to clean up embedding for {asset_id}: {del_err}"
+                    )
+                _delete_storage_object(supabase, filename)
+                raise HTTPException(
+                    status_code=500,
+                    detail="Could not register asset. Please try again."
+                )
 
             # Success — hand the uploader a previewable signed URL
             return JSONResponse(
